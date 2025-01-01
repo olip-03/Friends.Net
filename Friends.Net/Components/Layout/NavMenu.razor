@@ -1,0 +1,79 @@
+﻿@using System.ComponentModel.DataAnnotations
+@using Friends.Net.Components.Account
+@using Friends.Net.Data
+@implements IDisposable
+
+@inject NavigationManager NavigationManager
+@inject IdentityUserAccessor UserAccessor
+
+<div class="nav">
+    <div class="col-sm">
+        <div class="nav-item">
+            <NavLink class="nav-link" href="" Match="NavLinkMatch.All">
+                <span class="bi bi-house-door-fill-nav-menu" aria-hidden="true"></span> Home
+            </NavLink>
+        </div>
+    </div>
+    <div class="col-sm">
+        <div class="nav-item">
+            <NavLink class="nav-link" href="wiki" Match="NavLinkMatch.All">
+                <span class="bi bi-wiki-nav-menu" aria-hidden="true"></span> Wiki
+            </NavLink>
+        </div>
+    </div>
+    <div class="col-sm">
+        <div class="nav-item">
+            <NavLink class="nav-link" href="/Account/Manage" Match="NavLinkMatch.All">
+                <span class="bi bi-house-door-fill-nav-menu" aria-hidden="true"></span> Account
+            </NavLink>
+        </div>
+    </div>
+    @if (Input.IsAdmin)
+    {
+    <div class="col-sm">
+        <div class="nav-item">
+            <NavLink class="nav-link" href="settings" Match="NavLinkMatch.All">
+                <span class="bi bi-house-door-fill-nav-menu" aria-hidden="true"></span> Settings
+            </NavLink>
+        </div>
+    </div>
+    }
+</div>
+
+@code {    
+    [CascadingParameter] private HttpContext HttpContext { get; set; } = default!;
+    [SupplyParameterFromForm] private InputModel Input { get; set; } = new();
+    private ApplicationUser _user = default!;
+    private string? currentUrl;
+
+    protected override void OnInitialized()
+    {
+        currentUrl = NavigationManager.ToBaseRelativePath(NavigationManager.Uri);
+        NavigationManager.LocationChanged += OnLocationChanged;
+    }
+
+    private void OnLocationChanged(object? sender, LocationChangedEventArgs e)
+    {
+        currentUrl = NavigationManager.ToBaseRelativePath(e.Location);
+        StateHasChanged();
+    }
+
+    public void Dispose()
+    {
+        NavigationManager.LocationChanged -= OnLocationChanged;
+    }
+
+    protected override async Task OnInitializedAsync()
+    {
+        _user = await UserAccessor.GetRequiredUserAsync(HttpContext);
+        Input.PreferredName ??= _user.PreferredName;
+        Input.IsAdmin = false || _user.Email == "admin@oli.fm";
+    }
+    
+    private sealed class InputModel
+    {
+        [Display(Name = "Preferred Name")]
+        public string? PreferredName { get; set; }
+        public bool IsAdmin { get; set; }
+    }
+}

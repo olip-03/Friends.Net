@@ -1,0 +1,92 @@
+@using System.Collections.ObjectModel
+@using System.Diagnostics
+@using System.Reflection
+
+<div style="max-width: 100%; overflow-x: scroll;">
+    <table >
+        <caption>
+            @Caption
+        </caption>
+        <thead>
+        <tr>
+            @foreach(var property in _properties)
+            {
+                <th scope="col">
+                    <p>@property.Name</p>
+                </th>
+            }
+        </tr>
+        </thead>
+        <tbody>
+        @if (Items.Any())
+        {
+            foreach (var item in Items)
+            {
+                <tr>
+                    @foreach (var property in _properties)
+                    {
+                        <td>
+                            @{
+                                string value = property.GetValue(item)?.ToString() ?? string.Empty;
+                                int width = value.Length;
+                            }
+                            <input type="email"
+                                   class="form-control input"
+                                   style="min-width: @(width)rem"
+                                   id="exampleInputEmail1"
+                                   aria-describedby="emailHelp"
+                                   value="@value"
+                                   @onchange="(e) => Trace.WriteLine(e)"/>
+                        </td>
+                    }
+                </tr>
+            }
+        }
+        </tbody>
+        <tfoot>
+        <tr>
+            <th scope="row" colspan="@(_properties.Length-1)">
+                <p>Total</p>
+            </th>
+            <td>@Items.Count()</td>
+        </tr>
+        </tfoot>
+    </table>
+</div>
+
+@code {
+    [Parameter] public Type? ItemType { get; set; }
+    [Parameter] public IEnumerable<object> Items { get; set; } = [];
+    [Parameter] public  IEnumerable<string>? PropertyFilter { get; set; }
+    [Parameter] public string Caption { get; set; } = string.Empty;
+    [Parameter] public bool ShowGridControls { get; set; } = true;
+    [Parameter] public bool ShowCaption { get; set; } = true;
+
+    private PropertyInfo[] _properties = Array.Empty<PropertyInfo>();
+
+    protected override void OnInitialized()
+    {
+        if (ItemType != null)
+        {
+            if(PropertyFilter != null && PropertyFilter.Any())
+            {
+                List<PropertyInfo> properties = new();
+                foreach (var property in  ItemType.GetProperties())
+                {
+                    if (PropertyFilter.Contains(property.Name))
+                    {
+                        properties.Add(property);
+                    }
+                }
+                _properties = properties.ToArray();
+            }
+
+        }
+        base.OnInitialized();
+    }
+
+    private void PropertyChanged(object item, PropertyInfo info)
+    {
+        Trace.WriteLine($"Updated {item} to {info}");
+    }
+}

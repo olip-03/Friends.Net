@@ -1,0 +1,40 @@
+﻿@inherits LayoutComponentBase
+
+<div class="page">
+    <main>
+        <article class="content px-4">
+            <AuthorizeView>
+                <h1 class="title">
+                    @_pageTitle
+                </h1>
+                <NavMenu/>
+            </AuthorizeView>
+            @Body
+        </article>
+    </main>
+</div>
+
+<div id="blazor-error-ui" data-nosnippet>
+    An unhandled error has occurred.
+    <a href="." class="reload">Reload</a>
+    <span class="dismiss">🗙</span>
+</div>
+
+@code {
+    [Parameter] public RenderFragment? ChildContent { get; set; }
+
+    private static string _pageTitle = string.Empty;
+    public static MainLayout? Main = null;
+
+    protected override void OnInitialized()
+    {
+        Main = this;
+    }
+    
+    public void SetPageTitle(string title)
+    {
+        _pageTitle = title;
+        InvokeAsync(StateHasChanged);
+    }
+}
+

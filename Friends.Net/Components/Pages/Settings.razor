@@ -1,0 +1,59 @@
+﻿@page "/settings"
+
+@using System.Collections.ObjectModel
+@using System.ComponentModel.DataAnnotations
+@using Friends.Net.Components.Account
+@using Friends.Net.Data
+@using Microsoft.AspNetCore.Authorization
+@using Friends.Net.Components.Webpart
+@inject IdentityUserAccessor UserAccessor
+@inject ApplicationDbContext DbContext
+@inject Microsoft.AspNetCore.Antiforgery.IAntiforgery Xsrf
+
+@attribute [Authorize]
+
+<PageTitle>⚙️ Settings</PageTitle>
+
+<AuthorizeView>
+    @if(Input.IsAdmin)
+    {
+        <h1 class="settings">
+            Hello, @Input.PreferredName
+        </h1>
+        
+        <GridView 
+            ItemType="typeof(ApplicationShortcut)" 
+            Items="@_shortcuts" 
+            PropertyFilter="ApplicationShortcut.GetVisibleProperties()"/>
+    }
+    else
+    {
+        <p>You are not authorized to view this page.</p>
+    }
+</AuthorizeView>
+
+@code{
+    [CascadingParameter] private HttpContext HttpContext { get; set; } = default!;
+
+    private ApplicationUser _user = default!;
+    private InputModel Input { get; set; } = new();
+    
+    private List<ApplicationUser> users;
+    private List<ApplicationShortcut> _shortcuts;
+    
+
+    protected override async Task OnInitializedAsync()
+    {
+        _user = await UserAccessor.GetRequiredUserAsync(HttpContext);
+        Input.PreferredName ??= _user.PreferredName;
+        Input.IsAdmin = false || _user.Email == "admin@oli.fm";
+        users = DbContext.Users.ToList();
+    }
+    
+    private sealed class InputModel
+    {
+        [Display(Name = "Preferred Name")]
+        public string? PreferredName { get; set; }
+        public bool IsAdmin { get; set; }
+    }
+}
