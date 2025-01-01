@@ -6,6 +6,7 @@ public class ApplicationShortcut
 {
     public int Id { get; set; } = 0;
     public string Title { get; set; } = "";
+    public string URL { get; set; } = "";
     public string Icon { get; set; } = "";
     public List<ApplicationGroup> SecurityGroups { get; set; } = [];
     
@@ -15,6 +16,7 @@ public class ApplicationShortcut
         [
             "Title", 
             "Icon", 
+            "URL",
             "SecurityGroups", 
         ];
     }

@@ -1,9 +1,10 @@
 @using System.Collections.ObjectModel
 @using System.Diagnostics
 @using System.Reflection
+@using Mono.TextTemplating
 
 <div style="max-width: 100%; overflow-x: scroll;">
-    <table >
+    <table style="width: 100%;">
         <caption>
             @Caption
         </caption>
@@ -18,7 +19,7 @@
         </tr>
         </thead>
         <tbody>
-        @if (Items.Any())
+        @if (Items != null)
         {
             foreach (var item in Items)
             {
@@ -28,15 +29,11 @@
                         <td>
                             @{
                                 string value = property.GetValue(item)?.ToString() ?? string.Empty;
-                                int width = value.Length;
                             }
-                            <input type="email"
+                            <input type="text"
                                    class="form-control input"
-                                   style="min-width: @(width)rem"
-                                   id="exampleInputEmail1"
-                                   aria-describedby="emailHelp"
                                    value="@value"
-                                   @onchange="(e) => Trace.WriteLine(e)"/>
+                                   placeholder="@property.Name"/>
                         </td>
                     }
                 </tr>
@@ -48,7 +45,14 @@
             <th scope="row" colspan="@(_properties.Length-1)">
                 <p>Total</p>
             </th>
-            <td>@Items.Count()</td>
+            @if (Items != null)
+            {
+                <td>@Items.Count()</td>
+            }
+            else
+            {
+                <td>0</td>
+            }
         </tr>
         </tfoot>
     </table>
@@ -56,7 +60,7 @@
 
 @code {
     [Parameter] public Type? ItemType { get; set; }
-    [Parameter] public IEnumerable<object> Items { get; set; } = [];
+    [Parameter] public IEnumerable<object>? Items { get; set; } = [];
     [Parameter] public  IEnumerable<string>? PropertyFilter { get; set; }
     [Parameter] public string Caption { get; set; } = string.Empty;
     [Parameter] public bool ShowGridControls { get; set; } = true;
@@ -80,13 +84,48 @@
                 }
                 _properties = properties.ToArray();
             }
-
         }
+
+        AddEmpty();
         base.OnInitialized();
     }
-
-    private void PropertyChanged(object item, PropertyInfo info)
+    
+    private void TextChange(string searchFor)
     {
-        Trace.WriteLine($"Updated {item} to {info}");
+        searchFor ??= string.Empty;
+        Trace.WriteLine(searchFor);
+    }
+
+    private void AddEmpty()
+    {
+        Items ??= [];
+        if (ItemType != null && Items is not null)
+        {
+            try
+            {
+                // Create a new instance of the type specified by ItemType
+                var newItem = Activator.CreateInstance(ItemType);
+                if (newItem != null)
+                {
+                    // Ensure Items is mutable
+                    if (Items is List<object> itemList)
+                    {
+                        itemList.Add(newItem);
+                    }
+                    else
+                    {
+                        // Convert to a list, add the new item, and reassign
+                        var updatedItems = Items.ToList();
+                        updatedItems.Add(newItem);
+                        Items = updatedItems;
+                    }
+                }
+            }
+            catch (Exception ex)
+            {
+                Console.WriteLine($"Error adding empty item: {ex.Message}");
+            }
+        }
+        StateHasChanged();
     }
 }
