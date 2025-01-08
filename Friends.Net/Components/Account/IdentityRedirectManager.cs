@@ -1,3 +1,4 @@
+using System.Diagnostics;
 using System.Diagnostics.CodeAnalysis;
 using Microsoft.AspNetCore.Components;
 
@@ -28,9 +29,15 @@ internal sealed class IdentityRedirectManager(NavigationManager navigationManage
 
         // During static rendering, NavigateTo throws a NavigationException which is handled by the framework as a redirect.
         // So as long as this is called from a statically rendered Identity component, the InvalidOperationException is never thrown.
-        navigationManager.NavigateTo(uri);
-        throw new InvalidOperationException(
-            $"{nameof(IdentityRedirectManager)} can only be used during static rendering.");
+        try
+        {
+            navigationManager.NavigateTo(uri);
+            throw new InvalidOperationException($"{nameof(IdentityRedirectManager)} can only be used during static rendering.");
+        }
+        catch (Exception ex)
+        {
+            Trace.WriteLine(ex);
+        }
     }
 
     [DoesNotReturn]

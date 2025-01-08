@@ -3,25 +3,40 @@
 @using Friends.Net.Components.Account
 @using Friends.Net.Components.Layout
 @using Friends.Net.Data
+@using Friends.Net.Services
 @using Microsoft.AspNetCore.Authorization
 @using Microsoft.AspNetCore.Identity
 @inject IdentityUserAccessor UserAccessor
+@inject ApplicationDbContext DbContext
 @attribute [Authorize]
 
 <PageTitle>🏠 Oli's Friends Site</PageTitle>
 
 <AuthorizeView>
-    <div class="home"> 
-        <p>
-            Lorem ipsum dolor sit amet, consectetur adipiscing elit. In ac pulvinar nisi. Nulla dignissim sed nibh posuere maximus. Quisque faucibus, arcu vestibulum auctor ornare, risus eros dapibus eros, et ullamcorper nibh dui porta velit. Fusce commodo elit sit amet nunc elementum, eu rhoncus elit condimentum. Cras rutrum erat sit amet magna malesuada, vel aliquet ex facilisis. Aliquam consequat vitae sem id sollicitudin. Quisque pretium libero orci, dignissim ullamcorper arcu facilisis vel. Duis lacinia, nisi sed gravida scelerisque, nibh sapien vulputate metus, a pharetra purus erat rutrum massa. Vivamus vel metus enim. Nunc ultrices elit sit amet sollicitudin auctor. Duis venenatis nulla nec egestas semper. Nulla orci dolor, viverra et congue nec, efficitur at diam. Vestibulum eu magna non massa gravida gravida ut quis leo.
-
-            Vivamus in turpis faucibus, pulvinar sem vel, ultrices risus. Donec lacinia urna ut libero facilisis fermentum. Pellentesque vehicula, velit ac molestie ullamcorper, velit leo egestas nulla, vitae porta nibh risus sit amet massa. Praesent interdum laoreet nisi id tincidunt. Ut euismod felis sit amet metus viverra, eget porttitor nulla scelerisque. Integer dolor nunc, aliquet a feugiat id, scelerisque scelerisque lacus. Maecenas sit amet varius arcu. Morbi ultricies neque ipsum, vehicula egestas nisl elementum id.
-
-            Quisque rutrum ante id nibh pretium, vitae tempor nisl gravida. Quisque eu mauris dui. Integer egestas mattis euismod. Nullam fringilla velit ante, ut tempus turpis feugiat eget. Maecenas auctor lectus id dui volutpat bibendum. Sed scelerisque purus nec orci pellentesque, a maximus ipsum eleifend. Duis a ligula in quam vehicula ultricies. Quisque convallis enim turpis. Donec a elit orci. Morbi a posuere nulla. Aliquam mattis nulla quis purus efficitur, at condimentum felis mollis. Integer commodo leo at eleifend condimentum. Donec ultricies non ipsum nec hendrerit. Praesent fermentum luctus massa, vitae eleifend urna.
-
-            Donec tempus eros id nunc consectetur vulputate. Praesent porta auctor odio in sollicitudin. Nam vel malesuada mi. Suspendisse sed nisi id lacus lobortis varius quis quis neque. In efficitur nec ipsum id ullamcorper. Quisque eleifend lorem et ultrices gravida. Nulla dictum sit amet felis sed suscipit.
-
-            Donec scelerisque vel risus nec rutrum. Phasellus pellentesque, ligula sit amet mattis commodo, ex ipsum dictum tellus, at aliquam dolor turpis pretium dui. Integer a placerat tellus. Nulla a odio nec orci tincidunt cursus ut in dui. Duis vehicula, dui eu gravida euismod, dolor nulla fringilla lacus, sed blandit ante turpis vitae tellus. Vestibulum ante ipsum primis in faucibus orci luctus et ultrices posuere cubilia curae; Morbi bibendum dui sed erat fermentum, id semper mi finibus. Pellentesque facilisis ultrices arcu, a pellentesque nunc. Quisque consectetur ultricies aliquet. Maecenas lobortis lorem orci, a vulputate mauris sollicitudin quis. Sed sit amet massa vehicula, ultrices nulla ut, sagittis sem. Interdum et malesuada fames ac ante ipsum primis in faucibus. </p>
+    <div class="home">
+        <div class="appDrawer">
+            @foreach (var shortcut in _shortcuts)
+            {
+                <a class="app" href="@shortcut.URL" target="_blank" rel="noopener noreferrer">
+                    <img src="@shortcut.Icon"/>
+                    <p>@shortcut.Title</p>
+                </a>
+            }
+        </div>
+        
+        @* <AuthorizeView Roles="Admin Publisher"> *@
+        @*     <div class="forumPost"> *@
+        @*         <h2>New Post Here!</h2> *@
+        @*     </div> *@
+        @* </AuthorizeView> *@
+        
+        @for (int i = 0; i < 50; i++)
+        {
+            <div class="forum">
+                <h2>@LoremIpsum.Generate(1, 3, 1, 1, 1)</h2>
+                <p>@LoremIpsum.Generate(10, 20, 10, 50, 2)</p>
+            </div>
+        }
     </div>
 </AuthorizeView>
 
@@ -29,10 +44,13 @@
     [CascadingParameter] private HttpContext HttpContext { get; set; } = default!;
     [SupplyParameterFromForm] private InputModel Input { get; set; } = new();
     private ApplicationUser _user = default!;
-
+    private List<ApplicationShortcut> _shortcuts = []; 
+    
     protected override async Task OnInitializedAsync()
     {
         _user = await UserAccessor.GetRequiredUserAsync(HttpContext);
+        _shortcuts = DbContext.AppShortcuts.ToList();
+        
         Input.PreferredName ??= _user.PreferredName;
         Input.IsAdmin = false;
         MainLayout.Main?.SetPageTitle($"Hi, {Input.PreferredName}");

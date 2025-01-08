@@ -1,7 +1,6 @@
-@using System.Collections.ObjectModel
 @using System.Diagnostics
 @using System.Reflection
-@using Mono.TextTemplating
+@using System.Text.Json
 
 <div style="max-width: 100%; overflow-x: scroll;">
     <table style="width: 100%;">
@@ -9,51 +8,111 @@
             @Caption
         </caption>
         <thead>
-        <tr>
-            @foreach(var property in _properties)
-            {
-                <th scope="col">
-                    <p>@property.Name</p>
-                </th>
-            }
-        </tr>
+            <tr>
+                @foreach (var property in _properties)
+                {
+                    <th scope="col">
+                        <p>@property.Name</p>
+                    </th>
+                }
+                @if (RowActions is not null && RowActions.Any())
+                {
+                    foreach (var action in RowActions)
+                    {
+                        <th scope="col">
+                            <p>@action.Name</p>
+                        </th>
+                    }
+                }
+            </tr>
         </thead>
         <tbody>
-        @if (Items != null)
-        {
-            foreach (var item in Items)
-            {
-                <tr>
-                    @foreach (var property in _properties)
-                    {
-                        <td>
-                            @{
-                                string value = property.GetValue(item)?.ToString() ?? string.Empty;
-                            }
-                            <input type="text"
-                                   class="form-control input"
-                                   value="@value"
-                                   placeholder="@property.Name"/>
-                        </td>
-                    }
-                </tr>
-            }
-        }
-        </tbody>
-        <tfoot>
-        <tr>
-            <th scope="row" colspan="@(_properties.Length-1)">
-                <p>Total</p>
-            </th>
             @if (Items != null)
             {
-                <td>@Items.Count()</td>
+                int totalCount = Items.Count();
+                string className = "form-control input";
+                for (int count = 0; count < totalCount; count++)
+                {
+                    <tr>
+                        @{
+                            var item = Items.ElementAt(count);
+                            bool last = false;
+                            if ((count + 1) == totalCount)
+                            {
+                                className += " last";
+                                last = true;
+                            }
+
+                            foreach (var property in _properties)
+                            {
+                                <td>
+                                    @{
+                                        // Where the magic is happening
+                                        var retrieved = property.GetValue(item);
+                                        string value = retrieved?.ToString() ?? string.Empty;
+                                        if (IsCollectionType(retrieved.GetType()))
+                                        {
+                                            string[] collection = retrieved as string[];                                            
+                                            <input type="text"
+                                            class="@className"
+                                            value="@string.Join(",", collection)"
+                                            @onclick="(e) => UpdateClick(new MouseEventInfo(item, property, e))"
+                                            @onchange="(e) => UpdateProperty(new PropertyChangeInfo(item, property, e.Value?.ToString()))"
+                                            placeholder="@property.Name"/>
+                                        }
+                                        else
+                                        {
+                                            <input type="text"
+                                            class="@className"
+                                            value="@value"
+                                            @onclick="(e) => UpdateClick(new MouseEventInfo(item, property, e))"
+                                            @onchange="(e) => UpdateProperty(new PropertyChangeInfo(item, property, e.Value?.ToString()))"
+                                            placeholder="@property.Name"/>
+                                        }
+                                    }
+                                </td>
+                            }
+
+                            if (RowActions is not null && RowActions.Any() && !last)
+                            {
+                                foreach (var action in RowActions)
+                                {
+                                    <td>
+                                        <button class="btn-toolbar" onclick="@(() => action.Action.Invoke(item))">
+                                            <imr src="@action.IconUrl"></imr>
+                                        </button>
+                                    </td>
+                                }
+                            }
+                        }
+                    </tr>
+                }
             }
-            else
-            {
-                <td>0</td>
-            }
-        </tr>
+        </tbody>
+        <tfoot>
+            <tr>
+                @if (RowActions is not null && RowActions.Any())
+                {
+                    <th scope="row" colspan="@(_properties.Length + RowActions.Count() - 1)">
+                        <p>Total</p>
+                    </th>
+                }
+                else
+                {
+                    <th scope="row" colspan="@(_properties.Length - 1)">
+                        <p>Total</p>
+                    </th>
+                }
+
+                @if (Items != null && Items.Any())
+                {
+                    <td>@(Items.Count() - 1)</td>
+                }
+                else
+                {
+                    <td>0</td>
+                }
+            </tr>
         </tfoot>
     </table>
 </div>
@@ -61,63 +120,119 @@
 @code {
     [Parameter] public Type? ItemType { get; set; }
     [Parameter] public IEnumerable<object>? Items { get; set; } = [];
-    [Parameter] public  IEnumerable<string>? PropertyFilter { get; set; }
+    [Parameter] public IEnumerable<string>? PropertyFilter { get; set; }
+    [Parameter] public IEnumerable<RowAction>? RowActions { get; set; }
+    [Parameter] public Action<PropertyChangeInfo>? OnChange { get; set; }
+    [Parameter] public Action<MouseEventInfo>? OnClick { get; set; }
     [Parameter] public string Caption { get; set; } = string.Empty;
     [Parameter] public bool ShowGridControls { get; set; } = true;
     [Parameter] public bool ShowCaption { get; set; } = true;
 
     private PropertyInfo[] _properties = Array.Empty<PropertyInfo>();
+    public object? SelectedItem { get; private set; } = null;
 
-    protected override void OnInitialized()
+    protected override void OnParametersSet()
     {
         if (ItemType != null)
         {
-            if(PropertyFilter != null && PropertyFilter.Any())
+            if (PropertyFilter != null && PropertyFilter.Any())
             {
                 List<PropertyInfo> properties = new();
-                foreach (var property in  ItemType.GetProperties())
+                foreach (var property in ItemType.GetProperties())
                 {
                     if (PropertyFilter.Contains(property.Name))
                     {
                         properties.Add(property);
                     }
                 }
+
                 _properties = properties.ToArray();
+            }
+            else
+            {
+                _properties = ItemType.GetProperties();
             }
         }
 
         AddEmpty();
-        base.OnInitialized();
+        base.OnParametersSet();
     }
     
-    private void TextChange(string searchFor)
+    public object[] GetItems()
     {
-        searchFor ??= string.Empty;
-        Trace.WriteLine(searchFor);
+        List<object> toReturn = [];
+
+        var json1 = JsonSerializer.Serialize(Activator.CreateInstance(ItemType));
+        foreach (var item in Items)
+        {
+            var json2 = JsonSerializer.Serialize(item);
+            if (json1 == json2) continue;
+            toReturn.Add(item);
+        }
+
+        return toReturn.ToArray();
+    }
+
+    private void UpdateClick(MouseEventInfo mouseEvent)
+    {
+        SelectedItem = mouseEvent.Item;
+        OnClick?.Invoke(mouseEvent);
+    }
+
+    private void UpdateProperty(PropertyChangeInfo changeInfo)
+    {
+        try
+        {
+            if (changeInfo.Property == null)
+            {
+                throw new ArgumentNullException(nameof(changeInfo.Property), "The object cannot be null.");
+            }
+
+            if (changeInfo.PropertyInfo == null)
+            {
+                throw new ArgumentNullException(nameof(changeInfo.PropertyInfo), "The property cannot be null.");
+            }
+
+            if (!changeInfo.PropertyInfo.CanWrite)
+            {
+                Trace.WriteLine($"Property '{changeInfo.PropertyInfo.Name}' is read-only and cannot be updated.");
+                return;
+            }
+
+            var targetType = Nullable.GetUnderlyingType(changeInfo.PropertyInfo.PropertyType) ?? changeInfo.PropertyInfo.PropertyType;
+            object? convertedValue = Convert.ChangeType(changeInfo.NewValue, targetType);
+
+            changeInfo.PropertyInfo.SetValue(changeInfo.Property, convertedValue);
+            OnChange?.Invoke(changeInfo);
+
+            AddEmpty();
+        }
+        catch (Exception ex)
+        {
+            Trace.WriteLine($"Error updating property '{changeInfo.PropertyInfo?.Name}': {ex.Message}");
+        }
     }
 
     private void AddEmpty()
     {
         Items ??= [];
+
         if (ItemType != null && Items is not null)
         {
             try
             {
-                // Create a new instance of the type specified by ItemType
                 var newItem = Activator.CreateInstance(ItemType);
                 if (newItem != null)
                 {
-                    // Ensure Items is mutable
-                    if (Items is List<object> itemList)
+                    if (!IsLastEmpty(newItem))
                     {
-                        itemList.Add(newItem);
-                    }
-                    else
-                    {
-                        // Convert to a list, add the new item, and reassign
                         var updatedItems = Items.ToList();
                         updatedItems.Add(newItem);
                         Items = updatedItems;
+                    }
+                    else
+                    {
+                        Trace.WriteLine("Line Empty");
                     }
                 }
             }
@@ -126,6 +241,49 @@
                 Console.WriteLine($"Error adding empty item: {ex.Message}");
             }
         }
+
         StateHasChanged();
+        return;
+
+        bool IsLastEmpty(object newItem)
+        {
+            Items ??= [];
+            var enumerable = Items.ToList();
+            if (enumerable.Any())
+            {
+                var lastObj = enumerable.Last();
+                var json1 = JsonSerializer.Serialize(lastObj);
+                var json2 = JsonSerializer.Serialize(newItem);
+                return json1 == json2;
+            }
+
+            return false;
+        }
+    }
+
+    private static bool IsCollectionType(Type? type)
+    {
+        if (type == null) return false;
+        return (type.Name == "String[]");
+    }
+
+    public class RowAction(Action<object> action, string name, string iconUrl)
+    {
+        public Action<object> Action { get; set; } = action;
+        public string Name { get; set; } = name;
+        public string IconUrl { get; set; } = iconUrl;
+    }
+
+    public class MouseEventInfo(object item, PropertyInfo property, MouseEventArgs eventArgs)
+    {
+        public object Item { get; set; } = item;
+        public PropertyInfo Property { get; set; } = property;
+        public MouseEventArgs MouseInfo { get; set; } = eventArgs;
+    }
+    public class PropertyChangeInfo(object property, PropertyInfo propertyInfo, string newValue)
+    {
+        public object Property { get; set; } = property;
+        public PropertyInfo PropertyInfo { get; set; } = propertyInfo;
+        public string NewValue { get; set; } = newValue;
     }
 }

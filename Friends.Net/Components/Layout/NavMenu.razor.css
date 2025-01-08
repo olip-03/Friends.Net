@@ -125,7 +125,10 @@
     display: block;
 }
 
-@media (min-width: 641px) {
+@media (min-width: 800px) {
+    .nav-link {
+        flex-direction: row;
+    }
     .navbar-toggler {
         display: none;
     }

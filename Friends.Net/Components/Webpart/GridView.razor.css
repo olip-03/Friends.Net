@@ -48,5 +48,16 @@ tfoot td {
     border-radius: 0;
     font-family: sans-serif;
     font-size: 0.8rem;
+    background: inherit;
+    letter-spacing: 1px;
+}
+
+.last {
+    /* Inherit styles from .input */
+    border: var(--bs-border-width) solid #fff0;
+    border-radius: 0;
+    border-width: 0;
+    font-family: sans-serif;
+    font-size: 0.8rem;
     letter-spacing: 1px;
 }

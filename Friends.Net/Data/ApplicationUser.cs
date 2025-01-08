@@ -1,4 +1,5 @@
 using Microsoft.AspNetCore.Identity;
+using System.Xml.Linq;
 
 namespace Friends.Net.Data;
 
@@ -6,8 +7,13 @@ namespace Friends.Net.Data;
 public class ApplicationUser : IdentityUser
 {
     public string PreferredName { get; set; } = "";
-    public List<ApplicationGroup> Groups { get; set; } = [];
-
+    public bool IsEmpty()
+    {
+        return
+        string.IsNullOrWhiteSpace(PreferredName) &&
+        string.IsNullOrWhiteSpace(UserName) && 
+        string.IsNullOrWhiteSpace(Email);
+    }
     public static string[] GetVisibleProperties()
     {
         return

@@ -34,13 +34,14 @@
     </div>
 </div>
 
+<Email/>
+
 @code {
     private ApplicationUser user = default!;
     private string? username;
     private string? preferredName;
 
     [CascadingParameter] private HttpContext HttpContext { get; set; } = default!;
-
     [SupplyParameterFromForm] private InputModel Input { get; set; } = new();
 
     protected override async Task OnInitializedAsync()
@@ -56,13 +57,21 @@
     {
         if (String.IsNullOrWhiteSpace(Input.PreferredName))
         {
-            
             return;
         }
         user.PreferredName = Input.PreferredName.Trim() ?? user.PreferredName;
         await UserManager.UpdateAsync(user);
         await SignInManager.RefreshSignInAsync(user);
-        RedirectManager.RedirectToCurrentPageWithStatus("Your profile has been updated", HttpContext);
+
+        if (user.Email == "admin@oli.fm")
+        {
+            await UserManager.AddToRoleAsync(user, "Admin");
+            RedirectManager.RedirectToCurrentPageWithStatus("Your profile has been updated, with the added Admin Role.", HttpContext);
+        }
+        else
+        {
+            RedirectManager.RedirectToCurrentPageWithStatus("Your profile has been updated", HttpContext);
+        }
     }
 
     private sealed class InputModel

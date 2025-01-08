@@ -2,58 +2,220 @@
 
 @using System.Collections.ObjectModel
 @using System.ComponentModel.DataAnnotations
+@using System.Diagnostics
+@using System.Net.Mime
 @using Friends.Net.Components.Account
+@using Friends.Net.Components.Layout
 @using Friends.Net.Data
 @using Microsoft.AspNetCore.Authorization
 @using Friends.Net.Components.Webpart
+@using System.Text.Json
+@using Humanizer
 @inject IdentityUserAccessor UserAccessor
 @inject ApplicationDbContext DbContext
+@inject NavigationManager Navigation
 @inject Microsoft.AspNetCore.Antiforgery.IAntiforgery Xsrf
+@inject AuthenticationStateProvider AuthenticationStateProvider
 
-@attribute [Authorize]
+@rendermode InteractiveServer
+
+@attribute [Authorize(Policy = "Admin")]
 
 <PageTitle>⚙️ Settings</PageTitle>
 
 <AuthorizeView>
-    @if(Input.IsAdmin)
-    {
-        <h1 class="settings">
-            Hello, @Input.PreferredName
-        </h1>
-        
-        <GridView 
-            ItemType="typeof(ApplicationShortcut)" 
-            Items="@_shortcuts" 
-            PropertyFilter="ApplicationShortcut.GetVisibleProperties()"/>
-    }
-    else
-    {
-        <p>You are not authorized to view this page.</p>
-    }
+    <h2>Application Shortcuts</h2>
+    <GridView
+        @rendermode="InteractiveServer"
+        @ref=AppsGridview
+        ItemType="typeof(ApplicationShortcut)"
+        Items="@_shortcuts"
+        RowActions="@GetRowActions()"
+        OnChange="UpdateDbItem"
+        OnClick="OnGridCellClick"
+        PropertyFilter="ApplicationShortcut.GetVisibleProperties()"/>
+    <Modal @ref="_appsGridModal" title="Select Security Groups" IsVerticallyCentered="true">
+        <BodyTemplate>
+            @foreach (var group in _shortcutViewmodel)
+            {
+                // This modal needs to have a reference to which item it's actually affecting so we can
+                // save the values of this list to it later. 
+                <div class="form-check">
+                    <input class="form-check-input" type="checkbox" value="" id="flexCheckDefault" @bind="group.IsSelected">
+                    <label class="form-check-label" for="flexCheckDefault">
+                        @group.Group.Name
+                    </label>
+                </div>
+            }
+        </BodyTemplate>
+        <FooterTemplate>
+            <Button Color="ButtonColor.Secondary" @onclick="() => _appsGridModal.HideAsync()">Close</Button>
+            <Button Color="ButtonColor.Primary" @onclick="() => AppsModalSave(_shortcutViewmodel.ToArray())">Save changes</Button>
+        </FooterTemplate>
+    </Modal>
+    <hr />
+
+    <h2>Site groups</h2>
+    <GridView
+        @rendermode="InteractiveServer"
+        @ref=GroupGridView
+        ItemType="typeof(ApplicationGroup)"
+        Items="@_groups"
+        RowActions="@GetRowActions()"
+        OnChange="UpdateDbItem"
+        PropertyFilter="ApplicationGroup.GetVisibleProperties()"/>
+
+
 </AuthorizeView>
 
 @code{
-    [CascadingParameter] private HttpContext HttpContext { get; set; } = default!;
+    private List<ApplicationUser> _users = new();
+    private List<ApplicationGroup> _groups = new();
+    private List<ApplicationShortcut> _shortcuts = new();
 
-    private ApplicationUser _user = default!;
-    private InputModel Input { get; set; } = new();
-    
-    private List<ApplicationUser> users;
-    private List<ApplicationShortcut> _shortcuts;
+    private GridView? AppsGridview { get; set; } = null;
+    private Modal _appsGridModal = default!;
+    private List<AppGroupVM> _shortcutViewmodel = [];
+
+    private GridView? GroupGridView { get; set; } = null;
+    private GridView? ModalGridView { get; set; } = null;
     
 
     protected override async Task OnInitializedAsync()
     {
-        _user = await UserAccessor.GetRequiredUserAsync(HttpContext);
-        Input.PreferredName ??= _user.PreferredName;
-        Input.IsAdmin = false || _user.Email == "admin@oli.fm";
-        users = DbContext.Users.ToList();
+        MainLayout.Main?.SetPageTitle("Settings");
+        await RefreshDb();
     }
-    
-    private sealed class InputModel
+
+    private List<GridView.RowAction> GetRowActions()
     {
-        [Display(Name = "Preferred Name")]
-        public string? PreferredName { get; set; }
-        public bool IsAdmin { get; set; }
+        return [new GridView.RowAction(DeleteRow, "Delete", "img/bin.svg")];
+    }
+
+    private async Task RefreshDb()
+    {
+        var authState = await AuthenticationStateProvider.GetAuthenticationStateAsync();
+        var user = authState.User;
+        if (user.Identity?.IsAuthenticated == true)
+        {
+            _users = DbContext.Users.ToList();
+            _groups = DbContext.Groups.ToList();
+            _shortcuts = DbContext.AppShortcuts.ToList();
+        }
+        else
+        {
+            Navigation.NavigateTo("/login", true);
+        }
+        StateHasChanged();
+    }
+
+    private async void DeleteRow(object RowItem)
+    {
+        DbContext.Remove(RowItem);
+        await DbContext.SaveChangesAsync();
+        await RefreshDb();
+        Trace.WriteLine($"Item dropped successfully.");
+        return;
+    }
+
+    private async void UpdateDbItem(GridView.PropertyChangeInfo changeInfo)
+    {
+        await UpdateDb();
+    }
+
+    private async void OnGridCellClick(GridView.MouseEventInfo mouseInfo)
+    {
+        if (mouseInfo is { Item: ApplicationShortcut shortcut, Property.Name: "SecurityGroups" })
+        {
+            _shortcutViewmodel = _groups.Select(g => new AppGroupVM(g)).ToList();
+            foreach (var allGroups in _shortcutViewmodel)
+            {
+                allGroups.IsSelected = shortcut.SecurityGroups.Contains(allGroups.Group.Name);
+            }
+            await _appsGridModal.ShowAsync();
+        }
+    }
+
+    private async void AppsModalSave(AppGroupVM[] groups)
+    {
+        if (AppsGridview.SelectedItem is ApplicationShortcut shortcut)
+        {
+            shortcut.SecurityGroups = groups.Where(gs => gs.IsSelected)
+                .Select(gs => gs.Group.Name)
+                .ToArray();
+        }
+        await _appsGridModal.HideAsync();
+    }
+
+    private async Task UpdateDb()
+    {
+        Trace.WriteLine("Saving items to the database...");
+
+        if (AppsGridview == null || AppsGridview.Items == null || AppsGridview.ItemType == null)
+        {
+            Trace.WriteLine("No items to save.");
+            return;
+        }
+        if (GroupGridView == null || GroupGridView.Items == null || GroupGridView.ItemType == null)
+        {
+            Trace.WriteLine("No items to save.");
+            return;
+        }
+
+        try
+        {
+            var items = AppsGridview.GetItems();
+            foreach (var item in items)
+            {
+                if (item is ApplicationShortcut shortcut)
+                {
+                    if (shortcut.IsEmpty()) continue;
+                    var existingShortcut = DbContext.AppShortcuts
+                        .FirstOrDefault<ApplicationShortcut>(s => s.Id == shortcut.Id);
+
+                    if (existingShortcut != null)
+                    {
+                        DbContext.Entry(existingShortcut).CurrentValues.SetValues(shortcut);
+                    }
+                    else
+                    {
+                        DbContext.AppShortcuts.Add(shortcut);
+                    }
+                }
+            }
+
+            var groups = GroupGridView.GetItems();
+            foreach (var groupObj in groups)
+            {
+                if (groupObj is ApplicationGroup group)
+                {
+                    if (group.IsEmpty()) continue;
+                    var existingGroup = DbContext.Groups
+                        .FirstOrDefault<ApplicationGroup>(s => s.Id == group.Id);
+                    if (existingGroup != null)
+                    {
+                        DbContext.Entry(existingGroup).CurrentValues.SetValues(group);
+                    }
+                    else
+                    {
+                        DbContext.Groups.Add(group);
+                    }
+                }
+            }
+
+            await DbContext.SaveChangesAsync();
+            await RefreshDb();
+            Trace.WriteLine("Database updated successfully.");
+        }
+        catch (Exception ex)
+        {
+            Trace.WriteLine($"Error saving items to the database: {ex.Message}");
+        }
+    }
+
+    public sealed class AppGroupVM(ApplicationGroup shortcut)
+    {
+        public ApplicationGroup Group { get; set; } = shortcut;
+        public bool IsSelected { get; set; } = false;
     }
 }
