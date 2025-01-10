@@ -17,19 +17,22 @@
         <div class="appDrawer">
             @foreach (var shortcut in _shortcuts)
             {
+                var img = DbContext.AppImages.Where(i => i.Id == shortcut.IconId).First();
+                string toRender = $"data:image/jpeg;base64,{img.Base64}";
+
                 <a class="app" href="@shortcut.URL" target="_blank" rel="noopener noreferrer">
-                    <img src="@shortcut.Icon"/>
-                    <p>@shortcut.Title</p>
+                    <img src="@toRender" class="shortcutImg" />
+                    <p class="shortcutTxt">@shortcut.Title</p>
                 </a>
             }
         </div>
-        
+
         @* <AuthorizeView Roles="Admin Publisher"> *@
         @*     <div class="forumPost"> *@
         @*         <h2>New Post Here!</h2> *@
         @*     </div> *@
         @* </AuthorizeView> *@
-        
+
         @for (int i = 0; i < 50; i++)
         {
             <div class="forum">
@@ -45,11 +48,22 @@
     [SupplyParameterFromForm] private InputModel Input { get; set; } = new();
     private ApplicationUser _user = default!;
     private List<ApplicationShortcut> _shortcuts = []; 
-    
+
     protected override async Task OnInitializedAsync()
     {
         _user = await UserAccessor.GetRequiredUserAsync(HttpContext);
-        _shortcuts = DbContext.AppShortcuts.ToList();
+        _shortcuts.Clear();
+        foreach (var dbShortcut in DbContext.AppShortcuts)
+        {
+            foreach (var roleString in dbShortcut.SecurityGroups)
+            {
+                if (HttpContext.User.IsInRole(roleString)) 
+                {
+                    _shortcuts.Add(dbShortcut);
+                    continue;
+                }
+            }
+        }
         
         Input.PreferredName ??= _user.PreferredName;
         Input.IsAdmin = false;

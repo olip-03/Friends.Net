@@ -52,6 +52,11 @@ tfoot td {
     letter-spacing: 1px;
 }
 
+.input-invalid {
+    border: var(--bs-border-width) solid #ff0000;
+    border-radius: 2px;
+}
+
 .last {
     /* Inherit styles from .input */
     border: var(--bs-border-width) solid #fff0;
@@ -61,3 +66,4 @@ tfoot td {
     font-size: 0.8rem;
     letter-spacing: 1px;
 }
+

@@ -36,6 +36,8 @@
                     <tr>
                         @{
                             var item = Items.ElementAt(count);
+
+
                             bool last = false;
                             if ((count + 1) == totalCount)
                             {
@@ -47,6 +49,8 @@
                             {
                                 <td>
                                     @{
+                                        var requirement = CellRequirementList.Where(gs => gs.Reference == property.PropertyType);
+
                                         // Where the magic is happening
                                         var retrieved = property.GetValue(item);
                                         string value = retrieved?.ToString() ?? string.Empty;
@@ -55,7 +59,7 @@
                                             string[] collection = retrieved as string[];                                            
                                             <input type="text"
                                             class="@className"
-                                            value="@string.Join(",", collection)"
+                                            value="@string.Join(", ", collection)"
                                             @onclick="(e) => UpdateClick(new MouseEventInfo(item, property, e))"
                                             @onchange="(e) => UpdateProperty(new PropertyChangeInfo(item, property, e.Value?.ToString()))"
                                             placeholder="@property.Name"/>
@@ -68,6 +72,17 @@
                                             @onclick="(e) => UpdateClick(new MouseEventInfo(item, property, e))"
                                             @onchange="(e) => UpdateProperty(new PropertyChangeInfo(item, property, e.Value?.ToString()))"
                                             placeholder="@property.Name"/>
+                                        }
+
+                                        if (requirement.Any())
+                                        {
+                                            var reqItem = requirement.First();
+                                            reqItem.SetItem(item);
+                                            var passResponse = reqItem.CheckRequiremenet();
+                                            if (!passResponse)
+                                            {
+                                                // Invalid input here
+                                            }
                                         }
                                     }
                                 </td>
@@ -122,6 +137,7 @@
     [Parameter] public IEnumerable<object>? Items { get; set; } = [];
     [Parameter] public IEnumerable<string>? PropertyFilter { get; set; }
     [Parameter] public IEnumerable<RowAction>? RowActions { get; set; }
+    [Parameter] public IEnumerable<CellRequirements> CellRequirementList { get; set; } = [];
     [Parameter] public Action<PropertyChangeInfo>? OnChange { get; set; }
     [Parameter] public Action<MouseEventInfo>? OnClick { get; set; }
     [Parameter] public string Caption { get; set; } = string.Empty;
@@ -157,7 +173,7 @@
         AddEmpty();
         base.OnParametersSet();
     }
-    
+
     public object[] GetItems()
     {
         List<object> toReturn = [];
@@ -179,8 +195,14 @@
         OnClick?.Invoke(mouseEvent);
     }
 
-    private void UpdateProperty(PropertyChangeInfo changeInfo)
+    private async void UpdateProperty(PropertyChangeInfo changeInfo)
     {
+        var item = CellRequirementList.Where(gs => gs.Reference == changeInfo.Property);
+        if(item.Any())
+        {
+            var passResponse = item.First().CheckRequiremenet();
+        }
+
         try
         {
             if (changeInfo.Property == null)
@@ -272,6 +294,30 @@
         public Action<object> Action { get; set; } = action;
         public string Name { get; set; } = name;
         public string IconUrl { get; set; } = iconUrl;
+    }
+
+    public class CellRequirements(Type itemRef, Action<object> requirementAction)
+    {
+        public object Item { get; set; } = null;
+        public Type Reference { get; set; } = itemRef;
+        public Action<object> RequirementAction { get; set; } = requirementAction;
+
+        public bool CheckRequiremenet()
+        {
+            try
+            {
+                RequirementAction.Invoke(Item);
+            }
+            catch (Exception)
+            {
+                return false;
+            }
+            return true;
+        }
+        public void SetItem(object item)
+        {
+            Item = item;
+        }
     }
 
     public class MouseEventInfo(object item, PropertyInfo property, MouseEventArgs eventArgs)

@@ -7,4 +7,5 @@ public class ApplicationDbContext(DbContextOptions<ApplicationDbContext> options
 {
     public DbSet<ApplicationGroup> Groups { get; set; }
     public DbSet<ApplicationShortcut> AppShortcuts { get; set; }
+    public DbSet<ApplicationImage> AppImages { get; set; }
 }

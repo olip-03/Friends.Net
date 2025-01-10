@@ -17,6 +17,25 @@ namespace Friends.Net.Migrations
 #pragma warning disable 612, 618
             modelBuilder.HasAnnotation("ProductVersion", "9.0.0");
 
+            modelBuilder.Entity("Friends.Net.Data.ApplicationImage", b =>
+                {
+                    b.Property<Guid>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("TEXT");
+
+                    b.Property<string>("Base64")
+                        .IsRequired()
+                        .HasColumnType("TEXT");
+
+                    b.Property<string>("Name")
+                        .IsRequired()
+                        .HasColumnType("TEXT");
+
+                    b.HasKey("Id");
+
+                    b.ToTable("AppImages");
+                });
+
             modelBuilder.Entity("Friends.Net.Data.ApplicationShortcut", b =>
                 {
                     b.Property<int>("Id")
@@ -25,6 +44,9 @@ namespace Friends.Net.Migrations
 
                     b.Property<string>("Icon")
                         .IsRequired()
+                        .HasColumnType("TEXT");
+
+                    b.Property<Guid>("IconId")
                         .HasColumnType("TEXT");
 
                     b.PrimitiveCollection<string>("SecurityGroups")
@@ -254,6 +276,7 @@ namespace Friends.Net.Migrations
                     b.HasBaseType("Microsoft.AspNetCore.Identity.IdentityRole");
 
                     b.PrimitiveCollection<string>("SecurityGroupBinding")
+                        .IsRequired()
                         .HasColumnType("TEXT");
 
                     b.HasDiscriminator().HasValue("ApplicationGroup");

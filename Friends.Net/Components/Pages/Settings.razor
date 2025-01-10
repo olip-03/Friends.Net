@@ -33,19 +33,30 @@
         RowActions="@GetRowActions()"
         OnChange="UpdateDbItem"
         OnClick="OnGridCellClick"
+        CellRequirementList="GetCellRequirements()"
         PropertyFilter="ApplicationShortcut.GetVisibleProperties()"/>
     <Modal @ref="_appsGridModal" title="Select Security Groups" IsVerticallyCentered="true">
         <BodyTemplate>
-            @foreach (var group in _shortcutViewmodel)
-            {
-                // This modal needs to have a reference to which item it's actually affecting so we can
-                // save the values of this list to it later. 
-                <div class="form-check">
-                    <input class="form-check-input" type="checkbox" value="" id="flexCheckDefault" @bind="group.IsSelected">
-                    <label class="form-check-label" for="flexCheckDefault">
-                        @group.Group.Name
-                    </label>
-                </div>
+            @{
+                switch (_appsModalState)
+                {
+                    case "SecurityGroups":
+                        foreach (var group in _shortcutViewmodel)
+                        {
+                            // This modal needs to have a reference to which item it's actually affecting so we can
+                            // save the values of this list to it later.
+                            <div class="form-check">
+                                <input class="form-check-input" type="checkbox" value="" id="flexCheckDefault" @bind="group.IsSelected">
+                                <label class="form-check-label" for="flexCheckDefault">
+                                    @group.Group.Name
+                                </label>
+                            </div>
+                        }
+                        return;
+                    case "Icon":
+                        <InputFile OnChange="LoadFiles" />
+                        return;
+                }
             }
         </BodyTemplate>
         <FooterTemplate>
@@ -57,13 +68,13 @@
 
     <h2>Site groups</h2>
     <GridView
-        @rendermode="InteractiveServer"
-        @ref=GroupGridView
-        ItemType="typeof(ApplicationGroup)"
-        Items="@_groups"
-        RowActions="@GetRowActions()"
-        OnChange="UpdateDbItem"
-        PropertyFilter="ApplicationGroup.GetVisibleProperties()"/>
+    @rendermode="InteractiveServer"
+    @ref=GroupGridView
+    ItemType="typeof(ApplicationGroup)"
+    Items="@_groups"
+    RowActions="@GetRowActions()"
+    OnChange="UpdateDbItem"
+    PropertyFilter="ApplicationGroup.GetVisibleProperties()"/>
 
 
 </AuthorizeView>
@@ -76,10 +87,11 @@
     private GridView? AppsGridview { get; set; } = null;
     private Modal _appsGridModal = default!;
     private List<AppGroupVM> _shortcutViewmodel = [];
+    private string _appsModalState = "";
 
     private GridView? GroupGridView { get; set; } = null;
     private GridView? ModalGridView { get; set; } = null;
-    
+
 
     protected override async Task OnInitializedAsync()
     {
@@ -90,6 +102,18 @@
     private List<GridView.RowAction> GetRowActions()
     {
         return [new GridView.RowAction(DeleteRow, "Delete", "img/bin.svg")];
+    }
+
+    public List<GridView.CellRequirements> GetCellRequirements()
+    {
+        return [new GridView.CellRequirements(typeof(string[]), new Action<object>((e) => {
+    if(e is ApplicationShortcut shortcut) 
+    {
+    if(shortcut.SecurityGroups.Length == 0){
+    throw new Exception("hating");
+    }
+    }
+    }))];
     }
 
     private async Task RefreshDb()
@@ -125,14 +149,76 @@
 
     private async void OnGridCellClick(GridView.MouseEventInfo mouseInfo)
     {
-        if (mouseInfo is { Item: ApplicationShortcut shortcut, Property.Name: "SecurityGroups" })
+        if (mouseInfo is { Item: ApplicationShortcut shortcut })
         {
-            _shortcutViewmodel = _groups.Select(g => new AppGroupVM(g)).ToList();
-            foreach (var allGroups in _shortcutViewmodel)
+            _appsModalState = mouseInfo.Property.Name;
+            switch (mouseInfo.Property.Name)
             {
-                allGroups.IsSelected = shortcut.SecurityGroups.Contains(allGroups.Group.Name);
+                case "SecurityGroups":
+                    _shortcutViewmodel = _groups.Select(g => new AppGroupVM(g)).ToList();
+                    foreach (var allGroups in _shortcutViewmodel)
+                    {
+                        allGroups.IsSelected = shortcut.SecurityGroups.Contains(allGroups.Group.Name);
+                    }
+                    await _appsGridModal.ShowAsync();
+                    return;
+                case "Icon":
+                    await _appsGridModal.ShowAsync();
+                    return;
             }
-            await _appsGridModal.ShowAsync();
+        }
+    }
+
+    private async Task LoadFiles(InputFileChangeEventArgs e)
+    {
+        try
+        {
+            using var stream = e.File.OpenReadStream();
+            using var memoryStream = new MemoryStream();
+            await stream.CopyToAsync(memoryStream);
+            var fileBytes = memoryStream.ToArray();
+            var base64String = Convert.ToBase64String(fileBytes);
+
+            // Generate a URL for the file (replace this with your actual file-saving logic)
+            var fileName = e.File.Name;
+
+            // Check if the image already exists in the database
+            var existingImage = DbContext.AppImages.FirstOrDefault<ApplicationImage>(img => img.Name == fileName);
+            Guid iconId;
+
+            if (existingImage != null)
+            {
+                // Update existing entry
+                existingImage.Base64 = base64String;
+                DbContext.Entry(existingImage).CurrentValues.SetValues(existingImage);
+                iconId = existingImage.Id;
+            }
+            else
+            {
+                // Add new entry
+                var appImage = new ApplicationImage(fileName)
+                    {
+                        Base64 = base64String
+                    };
+                DbContext.AppImages.Add(appImage);
+                await DbContext.SaveChangesAsync(); // Save to generate the Id
+                iconId = appImage.Id;
+            }
+
+            // Assign Icon and IconId to the selected shortcut
+            if (AppsGridview.SelectedItem is ApplicationShortcut shortcut)
+            {
+                shortcut.Icon = fileName;
+                shortcut.IconId = iconId;
+            }
+
+            // Save changes to the database
+            await DbContext.SaveChangesAsync();
+            Trace.WriteLine("Images uploaded and saved to the database successfully.");
+        }
+        catch (Exception ex)
+        {
+            Trace.WriteLine($"Error uploading files: {ex.Message}");
         }
     }
 
@@ -144,6 +230,7 @@
                 .Select(gs => gs.Group.Name)
                 .ToArray();
         }
+        await UpdateDb();
         await _appsGridModal.HideAsync();
     }
 
