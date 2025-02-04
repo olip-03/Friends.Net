@@ -34,8 +34,8 @@ namespace Friends.Net.Services.LDAP
         {
             string connectionString = $"uid={_config.LdapUsername},{_config.LdapAccountPathDn},{_config.LdapBaseDn}";
             _connection.Connect(new Uri(_config.LdapPath));
-            // _connection.StartTransportLayerSecurity(true); 
             _connection.TrustAllCertificates();
+            // TODO: Fix crash if unable to complete (send user notification?)
             await _connection.BindAsync(Native.LdapAuthType.Simple, new LdapCredential
             {
                 UserName = connectionString,

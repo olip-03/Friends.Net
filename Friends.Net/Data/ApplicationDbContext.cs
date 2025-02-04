@@ -24,7 +24,7 @@ public class ApplicationDbContext(DbContextOptions<ApplicationDbContext> options
         }
         user.Email = updateData.Email;
         user.PreferredName = updateData.DisplayName;
-        user.ConnectedToLdap = updateData.IsLdapUser;
+        user.ConnectedToLdap = updateData.IsLdapObject;
         return true;
     }
 }

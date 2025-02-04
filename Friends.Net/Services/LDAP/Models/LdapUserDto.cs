@@ -2,19 +2,15 @@ using System.Net.NetworkInformation;
 using LdapForNet;
 namespace Friends.Net.Services.LDAP.Models;
 
-public class LdapUserDto
+public class LdapUserDto : LdapObject
 {
-    public string Uid { get; set; } = string.Empty;
     public string GivenName { get; set; } = string.Empty;
     public string Sn { get; set; } = string.Empty;
-    public string Cn { get; set; } = string.Empty;
     public string DisplayName { get; set; } = string.Empty;
     public string Password { get; set; } = string.Empty;
     public string Email { get; set; } = string.Empty;
     public string TelephoneNumber { get; set; } = string.Empty;
-    public bool IsLdapUser { get; set; } = true;
     public bool IsEnable { get; set; } = true;
-
     public static LdapUserDto? Builder(DirectoryEntry? entry)
     {
         if (entry == null) return null;

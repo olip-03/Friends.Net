@@ -25,86 +25,125 @@
 
 <div>
     <MudTabs Outlined="true" MinimumTabWidth="20px">
-        <!-- Users Controls -->
-        <MudTabPanel Text="Users" Icon="@Icons.Material.Filled.Person">
-            <MudPaper Square="true" Class="d-flex">
-                <MudIconButton Icon="@Icons.Material.Filled.Refresh" Color="Color.Dark" Class="rounded-0" OnClick="LoadData" />
-                <MudDivider Vertical="true" FlexItem="true" />
-                <MudIconButton Icon="@Icons.Material.Filled.Delete" Disabled="@_noUsersSelected" Color="Color.Dark" Class="rounded-0" OnClick="(() => ShowModal(ModalState.UserDelete))" />
-                <MudDivider Vertical="true" FlexItem="true" />
-                <MudButton StartIcon="@Icons.Material.Filled.PersonAdd" Color="Color.Dark" Class="rounded-0" OnClick="(() => ShowModal(ModalState.UsersAdd))">Add User</MudButton>
-                <MudButton StartIcon="@Icons.Material.Filled.Edit" Disabled="@_noUsersSelected" Color="Color.Dark" Class="rounded-0" OnClick="(() => ShowModal(ModalState.UsersEdit))">Edit User</MudButton>
-                <MudDivider Vertical="true" FlexItem="true" />
-                <MudButton StartIcon="@Icons.Material.Filled.PersonOff" Disabled="@_noUsersSelected" Color="Color.Dark" Class="rounded-0">Disable</MudButton>
-                <MudButton StartIcon="@Icons.Material.Filled.Check" Disabled="@_noUsersSelected" Color="Color.Dark" Class="rounded-0">Enable</MudButton>
-            </MudPaper>
+        @foreach (SettingsGroup group in GetSettingsGroups())
+        {
+            Type type = group.CollectionType;
+            var ldapUser = new LdapUserDto();
+            if (mudUserTable?.SelectedItems?.Count() > 1)
+            {
+                LdapUserDto? check = (LdapUserDto)mudUserTable?.SelectedItems?.First();
+                if (check is LdapUserDto usr)
+                {
+                    ldapUser = usr;
+                }
+            }
+            var ldapGroup = new LdapGroupDto();
+            if (mudGroupTable?.SelectedItems?.Count() > 1)
+            {
+                LdapGroupDto? check = (LdapGroupDto)mudUserTable?.SelectedItems?.First();
+                if (check is LdapGroupDto grp)
+                {
+                    ldapGroup = grp;
+                }
+            }
+            <MudTabPanel Text="@group.Name" Icon="@group.Icon">
+                <MudPaper Square="true" Class="d-flex">
+                    @{
+                        int check = 1;
+                        foreach (var tool in group.Tools)
+                        {
+                            if (tool.Section != check)
+                            {
+                                check = tool.Section;
+                                <MudDivider Vertical="true" FlexItem="true" />
+                            }
+                            if (string.IsNullOrWhiteSpace(tool.Label))
+                            {
+                                <MudIconButton Icon="@tool.Icon" Color="Color.Dark" Class="rounded-0" OnClick="() => tool.OnClick?.Invoke(this, EventArgs.Empty)"/>
+                            }
+                            else{
+                                <MudButton StartIcon="@tool.Icon" Color="Color.Dark" Class="rounded-0" OnClick="() => tool.OnClick?.Invoke(this, EventArgs.Empty)">
+                                    @tool.Label
+                                </MudButton>
+                            }
+                        }
+                    }
+                </MudPaper>
 
-            <MudTable T="LdapUserDto" Items="@Users" Hover="true" @onclick=CheckUsersTable Breakpoint="Breakpoint.Sm" @ref="mudUserTable"
-            RowClass="cursor-pointer" MultiSelection="true">
-                <ToolBarContent>
-                    <MudTextField @bind-Value="_userSearchString" Placeholder="Search" Adornment="Adornment.Start" AdornmentIcon="@Icons.Material.Filled.Search" IconSize="Size.Medium" Class="mt-0 mud-ripple"></MudTextField>
-                </ToolBarContent>
-                <HeaderContent>
-                    <MudTh>Email</MudTh>
-                    <MudTh>User ID</MudTh>
-                    <MudTh>Display Name</MudTh>
-                    <MudTh>Enabled</MudTh>
-                    <MudTh>Ldap User</MudTh>
-                </HeaderContent>
-                <RowTemplate>
-                    <MudTd DataLabel="Email">@context.Email</MudTd>
-                    <MudTd DataLabel="User ID">@context.Uid</MudTd>
-                    <MudTd DataLabel="Display Name">@context.DisplayName</MudTd>
-                    <MudTd DataLabel="Enabled">
-                        @if (context.IsEnable)
-                        {
-                            <MudIcon Icon="@Icons.Material.Filled.Check"></MudIcon>
-                        }
-                        else
-                        {
-                            <MudIcon Icon="@Icons.Material.Filled.Close"></MudIcon>
-                        }
-                    </MudTd>
-                    <MudTd DataLabel="Is LDAP User">
-                        @if (context.IsLdapUser)
-                        {
-                            <MudIcon Icon="@Icons.Material.Filled.Check"></MudIcon>
-                        }
-                        else
-                        {
-                            <MudIcon Icon="@Icons.Material.Filled.Close"></MudIcon>
-                        }
-                    </MudTd>
-                </RowTemplate>
-            </MudTable>
-        </MudTabPanel>
-        <!-- Groups Controls  -->
-        <MudTabPanel Text="Groups" Icon="@Icons.Material.Filled.Group">
-            <MudPaper Square="true" Class="d-flex">
-                <MudIconButton Icon="@Icons.Material.Filled.Refresh" Color="Color.Dark" Class="rounded-0" OnClick="LoadData" />
-                <MudDivider Vertical="true" FlexItem="true" />
-                <MudIconButton Icon="@Icons.Material.Filled.Delete" Color="Color.Dark" Class="rounded-0" OnClick="(() => ShowModal(ModalState.GroupsDelete))" />
-                <MudDivider Vertical="true" FlexItem="true" />
-                <MudButton StartIcon="@Icons.Material.Filled.GroupAdd" Color="Color.Dark" Class="rounded-0" OnClick="(() => ShowModal(ModalState.GroupsAdd))">Add Group</MudButton>
-                <MudButton StartIcon="@Icons.Material.Filled.Edit" Color="Color.Dark" Class="rounded-0" OnClick="(() => ShowModal(ModalState.GroupsEdit))">Edit Group</MudButton>
-            </MudPaper>
+                <MudTable T="LdapObject" Items="group.Collection" Hover="true" @onclick=CheckUsersTable Breakpoint="Breakpoint.Sm" @ref="group.Table" Loading="@_loading" SelectedItemChanged="(obj) => OnSelectedItemChanged(obj)" RowClass="cursor-pointer" MultiSelection="false">
+                    <HeaderContent>
+                        @{
 
-            <MudTable T="LdapGroupDto" Items="@Groups" Hover="true" MultiSelection="true" Breakpoint="Breakpoint.Sm" @ref="mudGroupTable">
-                <ToolBarContent>
-                    <MudTextField @bind-Value="_groupSearchString" Placeholder="Search" Adornment="Adornment.Start" AdornmentIcon="@Icons.Material.Filled.Search" IconSize="Size.Medium" Class="mt-0 mud-ripple"></MudTextField>
-                </ToolBarContent>
-                <HeaderContent>
-                    <MudTh>Cn</MudTh>
-                    <MudTh>Description</MudTh>
-                    <MudTh>Members</MudTh>
-                </HeaderContent>
-                <RowTemplate>
-                    <MudTd DataLabel="Cn">@context.Cn</MudTd>
-                    <MudTd DataLabel="Description">@context.Description</MudTd>
-                    <MudTd DataLabel="Members">@($"{context.Member.Length} members") </MudTd>
-                </RowTemplate>
-            </MudTable>
-        </MudTabPanel>
+                            if (type == typeof(LdapUserDto))
+                            {
+                                <MudTh></MudTh>
+                                <MudTh>Email</MudTh>
+                                <MudTh>User ID</MudTh>
+                                <MudTh>Display Name</MudTh>
+                                <MudTh>Enabled</MudTh>
+                                <MudTh>Ldap User</MudTh>
+                            }
+                            else if (type == typeof(LdapGroupDto))
+                            {
+                                <MudTh></MudTh>
+                                <MudTh>Cn</MudTh>
+                                <MudTh>Description</MudTh>
+                                <MudTh>Members</MudTh>
+                            }
+                        }
+                    </HeaderContent>
+                    <RowTemplate >
+                        @{
+                            var item = context as LdapObject;
+                            if (item is LdapUserDto user)
+                            {
+                                bool isSelected = item == _selectedUser;
+                                <MudTd DataLabel="Email">
+                                    <MudCheckBox T="bool"
+                                                 ReadOnly="true"
+                                                 Value="isSelected"></MudCheckBox>
+                                </MudTd>
+                                <MudTd DataLabel="Email">@user.Email</MudTd>
+                                <MudTd DataLabel="User ID">@user.Uid</MudTd>
+                                <MudTd DataLabel="Display Name">@user.DisplayName</MudTd>
+                                <MudTd DataLabel="Enabled">
+                                    @if (user.IsEnable)
+                                    {
+                                        <MudIcon Icon="@Icons.Material.Filled.Check"></MudIcon>
+                                    }
+                                    else
+                                    {
+                                        <MudIcon Icon="@Icons.Material.Filled.Close"></MudIcon>
+                                    }
+                                </MudTd>
+                                <MudTd DataLabel="Is LDAP User">
+                                    @if (user.IsLdapObject)
+                                    {
+                                        <MudIcon Icon="@Icons.Material.Filled.Check"></MudIcon>
+                                    }
+                                    else
+                                    {
+                                        <MudIcon Icon="@Icons.Material.Filled.Close"></MudIcon>
+                                    }
+                                </MudTd>
+                            }
+                            @if (context is LdapGroupDto group)
+                            {
+                                bool isSelected = item == _selectedGroup;
+                                <MudTd DataLabel="Email">
+                                    <MudCheckBox T="bool"
+                                                 ReadOnly="true"
+                                                 Value="isSelected"></MudCheckBox>
+                                </MudTd>
+                                <MudTd DataLabel="Cn">@group.Cn</MudTd>
+                                <MudTd DataLabel="Description">@group.Description</MudTd>
+                                <MudTd DataLabel="Members">@group.Members.Count()</MudTd>
+                            }
+                        }
+                    </RowTemplate>
+                </MudTable>
+            </MudTabPanel>
+        }
     </MudTabs>
 </div>
 
@@ -124,29 +163,39 @@
                         ObjectFormMapping="userDict" />
                         return;
                     case ModalState.UserDelete:
-                        var delTxt = mudUserTable.SelectedItems?.Count > 1 ? "multiple users" : mudUserTable.SelectedItems?.First().Uid;
-                        ToSave = mudUserTable.SelectedItem ?? new();
+                        var usrDelTxt = GetSettingsGroups()[0].Table.SelectedItems?.Count > 1 ? "multiple users" : _selectedUser.Uid;
+                        ToSave = _selectedUser;
                         <AutoMudForm Object="ToSave"
-                        Name="@delTxt"
+                        Name="@usrDelTxt"
                         Function="AutoMudForm.FormFunction.Delete"
                         ObjectFormMapping="userDict" />
                         return;
                     case ModalState.UsersEdit:
                         userDict["IsLdapUser"].ReadOnly = true;
                         userDict["Uid"].ReadOnly = true;
-                        ToSave = mudUserTable.SelectedItem ?? new();
-                        modId = mudUserTable?.SelectedItem?.Uid ?? "";
+                        ToSave = _selectedUser ?? new();
+                        modId = _selectedUser?.Uid ?? "";
                         <AutoMudForm Object="ToSave"
                         ObjectFormMapping="userDict" />
                         return;
                     case ModalState.GroupsAdd:
-                        <h3>Add Group</h3>
+                        ToSave = new LdapGroupDto();
+                        <AutoMudForm Object="ToSave"
+                        ObjectFormMapping="userDict" />
                         return;
                     case ModalState.GroupsDelete:
-                        <h3>Delete Group</h3>
+                        var groupDelTxt = _selectedGroup.Uid;
+                        ToSave = _selectedGroup;
+                        <AutoMudForm Object="ToSave"
+                        Name="@groupDelTxt"
+                        Function="AutoMudForm.FormFunction.Delete"
+                        ObjectFormMapping="userDict" />
                         return;
                     case ModalState.GroupsEdit:
-                        <h3>Edit Group</h3>
+                        ToSave = _selectedGroup ?? new();
+                        modId = _selectedGroup?.Uid ?? "";
+                        <AutoMudForm Object="ToSave"
+                        ObjectFormMapping="userDict" />
                         return;
                 }
             }
@@ -181,6 +230,7 @@
 }
 
 @code {
+    private bool _loading = true;
     private List<MudBlazor.BreadcrumbItem> _items =
     [
         new("Settings", href: "/Settings"),
@@ -190,12 +240,14 @@
     private string _userSearchString = string.Empty;
     private string _groupSearchString = string.Empty;
 
+    private LdapUserDto _selectedUser = null;
+    private LdapGroupDto _selectedGroup = null;
+
     private List<LdapUserDto> Users = new List<LdapUserDto>();
     private List<LdapGroupDto> Groups = new List<LdapGroupDto>();
 
-    private MudTable<LdapUserDto> mudUserTable = new();
-    private bool _noUsersSelected = true;
-    private MudTable<LdapGroupDto> mudGroupTable = new();
+    private MudTable<LdapObject> mudUserTable = new();
+    private MudTable<LdapObject> mudGroupTable = new();
 
     private Dictionary<string, AutoMudForm.FormData> userDict = new Dictionary<string, AutoMudForm.FormData>
             {
@@ -224,13 +276,53 @@
     private ModalState _modalState;
     private Modal _usersGroupsModal = default!;
 
+    private List<SettingsGroup> GetSettingsGroups()
+    {
+        List<SettingsGroup> settingsGroups = new List<SettingsGroup>
+        {
+            new SettingsGroup
+            {
+                Name = "Users",
+                Icon = Icons.Material.Filled.Person,
+                Tools = new SettingsGroupTool[]
+                {
+                    new SettingsGroupTool("Refresh", "", 1, Icons.Material.Filled.Refresh, (sender, args) => LoadData()),
+                    new SettingsGroupTool("Delete", "", 2, Icons.Material.Filled.Delete, (sender, args) => ShowModal(ModalState.UserDelete)),
+                    new SettingsGroupTool("Add User", "Add User", 3, Icons.Material.Filled.PersonAdd, (sender, args) => ShowModal(ModalState.UsersAdd)),
+                    new SettingsGroupTool("Edit User", "Edit User", 3, Icons.Material.Filled.Edit, (sender, args) => ShowModal(ModalState.UsersEdit)),
+                    new SettingsGroupTool("Disable", "Disable", 4, Icons.Material.Filled.PersonOff, (sender, args) => DisableSelected(true)),
+                    new SettingsGroupTool("Enable", "Enable", 4, Icons.Material.Filled.Check, (sender, args) => DisableSelected(false))
+                },
+                Table = mudUserTable,
+                CollectionType = typeof(LdapUserDto),
+                Collection = Users.ToArray()
+            },
+            new SettingsGroup
+            {
+                Name = "Groups",
+                Icon = Icons.Material.Filled.Group,
+                Tools = new SettingsGroupTool[]
+                {
+                    new SettingsGroupTool("Refresh", "", 1, Icons.Material.Filled.Refresh, (sender, args) => LoadData()),
+                    new SettingsGroupTool("Delete", "", 2, Icons.Material.Filled.Delete, (sender, args) => ShowModal(ModalState.GroupsDelete)),
+                    new SettingsGroupTool("Add Group", "Add Group", 3, Icons.Material.Filled.GroupAdd, (sender, args) => ShowModal(ModalState.GroupsAdd)),
+                    new SettingsGroupTool("Edit Group", "Edit Group", 3, Icons.Material.Filled.Edit, (sender, args) => ShowModal(ModalState.GroupsEdit))
+                },
+                CollectionType = typeof(LdapGroupDto),
+                Collection = Groups.ToArray()
+            }
+        };
+        return settingsGroups;
+    }
+
+
     protected override void OnAfterRender(bool firstRender)
     {
         if (!firstRender) return;
         LoadData();
     }
 
-    private async void LoadData() 
+    private async void LoadData()
     {
         Users = DbContext.Users.Select(u => u.ToLdap()).ToList();
         var ldapUsers = await LdapManager.Users.GetAll();
@@ -245,7 +337,7 @@
                 dbUser.DisplayName = user.DisplayName;
                 dbUser.Password = user.Password;
                 dbUser.Email = user.Email;
-                dbUser.IsLdapUser = true;
+                dbUser.IsLdapObject = true;
             }
             else
             {
@@ -254,6 +346,7 @@
         }
         var ldapGroups = await LdapManager.Group.GetAll();
         Groups = ldapGroups.ToList();
+        _loading = false;
         StateHasChanged();
     }
 
@@ -301,7 +394,7 @@
 
     private void CheckUsersTable()
     {
-        _noUsersSelected = mudUserTable.SelectedItems?.Count == 0;
+        // _noUsersSelected = mudUserTable.SelectedItems?.Count == 0;
     }
 
     private async void CreateObject(object Object)
@@ -319,7 +412,7 @@
                 return;
             }
             await UserManager.DeleteAsync(dbObj);
-            if(dbObj.ConnectedToLdap)
+            if (dbObj.ConnectedToLdap)
             {
                 var result = await LdapManager.Users.Delete(ldapUser);
                 if (result)
@@ -333,10 +426,86 @@
 
     private async void SaveObject(string uid, object Object)
     {
-        if(Object is LdapUserDto ldapUser)
+        if (Object is LdapUserDto ldapUser)
         {
             var result = await LdapManager.Users.Update(uid, ldapUser);
         }
         await _usersGroupsModal.HideAsync();
+    }
+
+    private void DisableSelected(bool forReal)
+    {
+        // if (mudUserTable.SelectedItems == null)
+        // {
+        //     return;
+        // }
+        // foreach (var user in mudUserTable.SelectedItems)
+        // {
+        //     ToggleUserState(user.Uid, false);
+        // }
+        foreach (var group in mudGroupTable.SelectedItems)
+        {
+            // ToggleUserState(user.Uid, false);
+        }
+    }
+
+    private void OnSelectedItemChanged(LdapObject selectedItems)
+    {
+        if (selectedItems is LdapUserDto user)
+        {
+            _selectedUser = user;
+        }
+        else if (selectedItems is LdapGroupDto group)
+        {
+            _selectedGroup = group;
+        }
+    }
+
+    private async void ToggleUserState(string uid, bool state)
+    {
+        LdapUserDto? result = await LdapManager.Users.Get(uid);
+        if (result == null)
+        {
+            return;
+        }
+        result.IsEnable = state;
+        await LdapManager.Users.Update(uid, result);
+    }
+
+    private LdapUserDto GetSelectedUser()
+    {
+        LdapUserDto user = new();
+        if (mudUserTable?.SelectedItems == null)
+        {
+            return user;
+        }
+        else if (mudUserTable?.SelectedItems?.Count() > 1)
+        { 
+            var check = mudUserTable?.SelectedItems?.First();
+            if (check is LdapUserDto usr)
+            {
+                user = usr;
+            }
+        }
+        return user;
+    }
+
+    private class SettingsGroup
+    {
+        public string Name { get; set; } = string.Empty;
+        public string Icon { get; set; } = string.Empty;
+        public SettingsGroupTool[] Tools { get; set; } = [];
+        public Type CollectionType { get; set; } = typeof(string);
+        public LdapObject[] Collection { get; set; } = [];
+        public MudTable<LdapObject>? Table { get; set; }
+    }
+
+    private class SettingsGroupTool(string tooltip, string label, int section, string icon, EventHandler onClick)
+    {
+        public string Tooltip { get; set; } = tooltip;
+        public string Label { get; set; } = label;
+        public string Icon { get; set; } = icon;
+        public int Section { get; set; } = section;
+        public EventHandler? OnClick { get; set; } = onClick;
     }
 }

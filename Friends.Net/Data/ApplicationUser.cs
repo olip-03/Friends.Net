@@ -23,7 +23,7 @@ public class ApplicationUser : IdentityUser
             Sn = UserName,
             Email = Email,
             DisplayName = PreferredName,
-            IsLdapUser = false
+            IsLdapObject = false
         };
     }
     public static string[] GetVisibleProperties()

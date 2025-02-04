@@ -31,8 +31,8 @@ namespace Friends.Net.Services.LDAP
                     ObjectClass = objClass?.FirstOrDefault() ?? "",
                     Cn = cn?.FirstOrDefault() ?? "",
                     Description = description?.FirstOrDefault() ?? "",
-                    IpaUniqueID = ipaUniqueID?.FirstOrDefault() ?? "",
-                    Member = members
+                    Uid = ipaUniqueID?.FirstOrDefault() ?? "",
+                    Members = members
                 });
             }
             return await Task.FromResult(ldapGroups.ToArray());
