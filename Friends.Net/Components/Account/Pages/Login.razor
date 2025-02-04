@@ -1,14 +1,19 @@
 ﻿@page "/Account/Login"
 
 @using System.ComponentModel.DataAnnotations
+@using Friends.Net.Services.LDAP
+@using Friends.Net.Services.LDAP.Models
 @using Microsoft.AspNetCore.Authentication
 @using Microsoft.AspNetCore.Identity
 @using Friends.Net.Data
 
+@inject ApplicationDbContext DbContext
 @inject SignInManager<ApplicationUser> SignInManager
+@inject UserManager<ApplicationUser> UserManager
 @inject ILogger<Login> Logger
 @inject NavigationManager NavigationManager
 @inject IdentityRedirectManager RedirectManager
+@inject LdapManager LdapManager
 
 <PageTitle>Log in</PageTitle>
 
@@ -72,9 +77,12 @@
     [SupplyParameterFromForm] private InputModel Input { get; set; } = new();
 
     [SupplyParameterFromQuery] private string? ReturnUrl { get; set; }
+    private List<string> ldapResults = new List<string>();
 
     protected override async Task OnInitializedAsync()
     {
+        // ldapResults = await Task.Run(() =>
+
         if (HttpMethods.IsGet(HttpContext.Request.Method))
         {
             // Clear the existing external cookie to ensure a clean login process
@@ -86,7 +94,20 @@
     {
         // This doesn't count login failures towards account lockout
         // To enable password failures to trigger account lockout, set lockoutOnFailure: true
+        var ldapPass = await LdapManager.Users.AuthenticateUser(Input.Email, Input.Password);
         var result = await SignInManager.PasswordSignInAsync(Input.Email, Input.Password, Input.RememberMe, lockoutOnFailure: false);
+
+        if(ldapPass.Succeeded && !result.Succeeded)
+        { // users details need to be updated in the local db 
+            ApplicationUser? localuser = DbContext.Users.FirstOrDefault(u => u.Email == Input.Email);
+            LdapUserDto? ldapUser = await LdapManager.Users.Get(Input.Email);
+            DbContext.UpdateLocalUser(ldapUser);
+
+            await UserManager.RemovePasswordAsync(localuser);
+            await UserManager.AddPasswordAsync(localuser, Input.Password);
+
+            result = await SignInManager.PasswordSignInAsync(Input.Email, Input.Password, Input.RememberMe, lockoutOnFailure: false);
+        }
 
         if (result.Succeeded)
         {

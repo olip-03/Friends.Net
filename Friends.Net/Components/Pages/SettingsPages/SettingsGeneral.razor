@@ -1,0 +1,16 @@
+﻿@page "/Settings/General"
+@inject NavigationManager Navigation
+
+<div style="display: ruby-base;">
+    <MudIconButton Icon="@Icons.Material.Filled.ArrowBack" aria-label="back" OnClick="(() => Navigation.NavigateTo(_items.First().Href))" />
+    <MudBreadcrumbs Items="_items"></MudBreadcrumbs>
+</div>
+
+
+@code {
+    private List<MudBlazor.BreadcrumbItem> _items =
+    [
+        new("Settings", href: "/Settings"),
+        new("General", href: null, disabled: true),
+    ];
+}

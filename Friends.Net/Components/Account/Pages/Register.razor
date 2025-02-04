@@ -7,6 +7,7 @@
 @using Microsoft.AspNetCore.Identity
 @using Microsoft.AspNetCore.WebUtilities
 @using Friends.Net.Data
+@using Friends.Net.Services.LDAP
 
 @inject UserManager<ApplicationUser> UserManager
 @inject IUserStore<ApplicationUser> UserStore
@@ -15,6 +16,7 @@
 @inject ILogger<Register> Logger
 @inject NavigationManager NavigationManager
 @inject IdentityRedirectManager RedirectManager
+@inject LdapManager LdapManager
 
 <PageTitle>Register</PageTitle>
 
@@ -72,23 +74,18 @@
     public async Task RegisterUser(EditContext editContext)
     {
         var user = CreateUser();
+        // bool createInLDAP = await LdapManager.Users.Create(new LdapUserDto()
+        // {
+        //     Email = Input.Email,
+        //     DisplayName = Input.PreferredName
+        // });
+        
         user.PreferredName = Input.PreferredName.Trim();
         
         await UserStore.SetUserNameAsync(user, Input.Email, CancellationToken.None);
         var emailStore = GetEmailStore();
         await emailStore.SetEmailAsync(user, Input.Email, CancellationToken.None);
         var result = await UserManager.CreateAsync(user, Input.Password);
-        using (var cn = new LdapConnection())
-        {
-            // connect
-            cn.Connect("192.168.1.15", 389);
-            // bind with an username and password
-            // this how you can verify the password of an user
-            cn.Bind("<<userdn>>", "<<userpassword>>");
-            // call ldap op
-            // cn.Delete("<<userdn>>")
-            // cn.Add(<<ldapEntryInstance>>)
-        }
 
 
         if (!result.Succeeded)

@@ -1,3 +1,4 @@
+using Friends.Net.Services.LDAP.Models;
 using Microsoft.AspNetCore.Identity;
 using System.Xml.Linq;
 
@@ -7,12 +8,23 @@ namespace Friends.Net.Data;
 public class ApplicationUser : IdentityUser
 {
     public string PreferredName { get; set; } = "";
+    public bool ConnectedToLdap { get; set; } = false;
     public bool IsEmpty()
     {
         return
         string.IsNullOrWhiteSpace(PreferredName) &&
         string.IsNullOrWhiteSpace(UserName) && 
         string.IsNullOrWhiteSpace(Email);
+    }
+    public LdapUserDto ToLdap()
+    {
+        return new LdapUserDto
+        {
+            Sn = UserName,
+            Email = Email,
+            DisplayName = PreferredName,
+            IsLdapUser = false
+        };
     }
     public static string[] GetVisibleProperties()
     {

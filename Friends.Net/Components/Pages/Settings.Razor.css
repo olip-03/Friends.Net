@@ -1,0 +1,15 @@
+﻿.menuButtonGroup {
+}
+.menuButton {
+    text-transform: none !important;
+    width: 100%;
+    margin-left: 7px;
+}
+
+.menuButtonTitle {
+    margin: 0;
+    text-align:start;
+}
+p.menuButton {
+    margin: 0;
+}

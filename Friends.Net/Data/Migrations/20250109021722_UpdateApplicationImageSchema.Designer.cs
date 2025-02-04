@@ -3,6 +3,7 @@ using System;
 using Friends.Net.Data;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore.Infrastructure;
+using Microsoft.EntityFrameworkCore.Migrations;
 using Microsoft.EntityFrameworkCore.Storage.ValueConversion;
 
 #nullable disable
@@ -10,9 +11,11 @@ using Microsoft.EntityFrameworkCore.Storage.ValueConversion;
 namespace Friends.Net.Migrations
 {
     [DbContext(typeof(ApplicationDbContext))]
-    partial class ApplicationDbContextModelSnapshot : ModelSnapshot
+    [Migration("20250109021722_UpdateApplicationImageSchema")]
+    partial class UpdateApplicationImageSchema
     {
-        protected override void BuildModel(ModelBuilder modelBuilder)
+        /// <inheritdoc />
+        protected override void BuildTargetModel(ModelBuilder modelBuilder)
         {
 #pragma warning disable 612, 618
             modelBuilder.HasAnnotation("ProductVersion", "9.0.0");
@@ -23,11 +26,7 @@ namespace Friends.Net.Migrations
                         .ValueGeneratedOnAdd()
                         .HasColumnType("TEXT");
 
-                    b.Property<string>("Base64")
-                        .IsRequired()
-                        .HasColumnType("TEXT");
-
-                    b.Property<string>("Name")
+                    b.Property<string>("Url")
                         .IsRequired()
                         .HasColumnType("TEXT");
 
@@ -41,10 +40,6 @@ namespace Friends.Net.Migrations
                     b.Property<int>("Id")
                         .ValueGeneratedOnAdd()
                         .HasColumnType("INTEGER");
-
-                    b.Property<string>("Icon")
-                        .IsRequired()
-                        .HasColumnType("TEXT");
 
                     b.Property<Guid>("IconId")
                         .HasColumnType("TEXT");
@@ -63,6 +58,8 @@ namespace Friends.Net.Migrations
 
                     b.HasKey("Id");
 
+                    b.HasIndex("IconId");
+
                     b.ToTable("AppShortcuts");
                 });
 
@@ -77,9 +74,6 @@ namespace Friends.Net.Migrations
                     b.Property<string>("ConcurrencyStamp")
                         .IsConcurrencyToken()
                         .HasColumnType("TEXT");
-
-                    b.Property<bool>("ConnectedToLdap")
-                        .HasColumnType("INTEGER");
 
                     b.Property<string>("Email")
                         .HasMaxLength(256)
@@ -283,6 +277,17 @@ namespace Friends.Net.Migrations
                         .HasColumnType("TEXT");
 
                     b.HasDiscriminator().HasValue("ApplicationGroup");
+                });
+
+            modelBuilder.Entity("Friends.Net.Data.ApplicationShortcut", b =>
+                {
+                    b.HasOne("Friends.Net.Data.ApplicationImage", "Icon")
+                        .WithMany()
+                        .HasForeignKey("IconId")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired();
+
+                    b.Navigation("Icon");
                 });
 
             modelBuilder.Entity("Microsoft.AspNetCore.Identity.IdentityRoleClaim<string>", b =>

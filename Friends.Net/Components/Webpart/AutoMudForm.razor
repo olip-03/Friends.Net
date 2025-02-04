@@ -1,0 +1,111 @@
+﻿@page "/add-user"
+@using Friends.Net.Services.LDAP.Models
+@using System.Reflection
+
+<MudForm Model="@_objectType" IsValid="isValid" Ref="@form">
+    <MudCardContent>
+        <MudGrid>
+            @switch (Function)
+            {
+                case FormFunction.Delete:
+                    string placeholderVal = $"Delete {Name}";
+                    <MudLayout>
+                        <p>Please enter '@placeholderVal' to confirm.</p>
+                        <MudTextField T="string" Placeholder="@placeholderVal" />
+                    </MudLayout>
+                    break;
+                default:
+                    foreach (var item in _properties)
+                    {
+                        var retrieved = item.GetValue(Object);
+                        string name = item.Name;
+                        string value = retrieved?.ToString() ?? string.Empty;
+                        bool requirement = false;
+                        bool readOnly = false;
+                        if (ObjectFormMapping.ContainsKey(item.Name))
+                        {
+                            var map = ObjectFormMapping[item.Name];
+                            if (map.HiddenValue) continue;
+                            name = map.FriendlyName;
+                            requirement = map.IsRequired;
+                            readOnly = map.ReadOnly;
+                        }
+                        switch (item.PropertyType)
+                        {
+                            case Type t when t == typeof(bool):
+                                bool valueSwitch = (bool)(retrieved ?? false);
+                                <MudItem xs="12" sm="6">
+                                    <MudCheckBox @bind-Value="valueSwitch"
+                                                 @onclick="() => {if(!readOnly){item.SetValue(Object, !valueSwitch);}}"
+                                                 ReadOnly="readOnly" Color="@Color.Primary">
+                                        @name: @(value.ToString())
+                                    </MudCheckBox>
+                                </MudItem>
+                                break;
+                            default:
+                                <MudItem xs="12" sm="6">
+                                    <MudTextField 
+                                        T="string"
+                                        Placeholder="Test" 
+                                        ReadOnly="readOnly" 
+                                        Label="@name" 
+                                        Text="@value"
+                                        TextChanged="(e) => {if(!readOnly){item.SetValue(Object, e);}}"
+                                        Required="requirement" />
+                                </MudItem>
+                                break;
+                        }
+                    }
+                    break;
+            }
+        </MudGrid>
+    </MudCardContent>
+</MudForm>
+
+@code {
+    [Parameter] public string Name { get; set; } = "";
+    [Parameter] public object? Object { get; set; }
+    [Parameter] public Dictionary<string, FormData> ObjectFormMapping { get; set; } = [];
+    [Parameter] public FormFunction Function { get; set; } = FormFunction.Add;
+
+    private Type? _objectType => Object?.GetType() ?? null;
+    private PropertyInfo[] _properties = Array.Empty<PropertyInfo>();
+
+    private MudForm? form = default;
+    private bool isValid;
+
+    protected override Task OnInitializedAsync()
+    {
+        _properties = _objectType?.GetProperties() ?? [];
+        Name = _objectType?.Name ?? "";
+        return base.OnInitializedAsync();
+    }
+
+    private async Task SubmitForm()
+    {
+        if (form == null) return;
+        await form.Validate();
+        if (isValid)
+        {
+            Console.WriteLine("User successfully added:");
+            // Console.WriteLine($"UID: {ldapUser.Uid}, Name: {ldapUser.GivenName} {ldapUser.Sn}");
+            // Call API or service to handle user creation
+        }
+    }
+
+    public enum FormFunction
+    {
+        Add,
+        Delete,
+        Edit
+    }
+
+    public class FormData(string value, string friendlyName, bool isRequired = false, bool isHidden = false, bool readOnly = false)
+    {
+        public string ValueName { get; set; } = value;
+        public string FriendlyName { get; set; } = friendlyName;
+        public bool IsRequired { get; set; } = isRequired;
+        public bool HiddenValue { get; set; } = isHidden;
+        public bool ReadOnly { get; set; } = readOnly;
+    }
+}
