@@ -43,13 +43,15 @@
                                 </MudItem>
                                 break;
                             default:
+                                string helpertxt = readOnly ? "Read only property." : "";
                                 <MudItem xs="12" sm="6">
                                     <MudTextField 
                                         T="string"
-                                        Placeholder="Test" 
-                                        ReadOnly="readOnly" 
+                                        ReadOnly="readOnly"
+                                        HelperText="@helpertxt"
                                         Label="@name" 
                                         Text="@value"
+                                        Variant="Variant.Text"
                                         TextChanged="(e) => {if(!readOnly){item.SetValue(Object, e);}}"
                                         Required="requirement" />
                                 </MudItem>

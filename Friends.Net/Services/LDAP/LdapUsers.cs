@@ -5,6 +5,7 @@ using LdapForNet;
 using LdapForNet.Native;
 using Microsoft.AspNetCore.Identity;
 using Microsoft.CodeAnalysis.CSharp.Syntax;
+using System.Reflection;
 using static LdapForNet.Native.Native;
 using static Microsoft.EntityFrameworkCore.DbLoggerCategory.Database;
 
@@ -70,6 +71,13 @@ public class LdapUsers(LdapConnection _connection, LdapConfig _config)
         {
             throw new ArgumentException("UID cannot be null or empty", nameof(uid));
         }
+
+        // Check if uid is an email address and split it by '@'
+        if (uid.Contains('@'))
+        {
+            uid = uid.Split('@').First();
+        }
+
         DirectoryEntry? user = null;
         await Task.Run(() =>
         {
@@ -103,6 +111,74 @@ public class LdapUsers(LdapConnection _connection, LdapConfig _config)
                 {"password", [toCreate.Password] }
             }
         });
+        return true;
+    }
+
+    public async Task<bool> Delete(LdapUserDto toDelete)
+    {
+        try
+        {
+            await _connection.DeleteAsync($"uid={toDelete.Uid},{_config.LdapAccountPathDn},{_config.LdapBaseDn}");
+        }
+        catch (Exception ex)
+        {
+            return false;
+        }
+        return true;
+    }
+
+    public async Task<bool> Update(string uid, LdapUserDto updateData)
+    {
+        try
+        {
+            await _connection.ModifyAsync(new LdapModifyEntry
+            {
+                Dn = $"uid={uid},{_config.LdapAccountPathDn},{_config.LdapBaseDn}",
+                Attributes = new List<LdapModifyAttribute>
+                {
+                    new LdapModifyAttribute
+                    {
+                        LdapModOperation = LdapModOperation.LDAP_MOD_REPLACE,
+                        Type = "givenName",
+                        Values = new List<string> { updateData.GivenName }
+                    },
+                    new LdapModifyAttribute
+                    {
+                        LdapModOperation = LdapModOperation.LDAP_MOD_REPLACE,
+                        Type = "sn",
+                        Values = new List<string> { updateData.Sn }
+                    },
+                    new LdapModifyAttribute
+                    {
+                        LdapModOperation = LdapModOperation.LDAP_MOD_REPLACE,
+                        Type = "cn",
+                        Values = new List<string> { updateData.Cn }
+                    },
+                    new LdapModifyAttribute
+                    {
+                        LdapModOperation = LdapModOperation.LDAP_MOD_REPLACE,
+                        Type = "displayName",
+                        Values = new List<string> { updateData.DisplayName }
+                    },
+                    new LdapModifyAttribute
+                    {
+                        LdapModOperation = LdapModOperation.LDAP_MOD_REPLACE,
+                        Type = "mail",
+                        Values = new List<string> { updateData.Email }
+                    },
+                    new LdapModifyAttribute
+                    {
+                        LdapModOperation = LdapModOperation.LDAP_MOD_REPLACE,
+                        Type = "nsaccountlock",
+                        Values = new List<string> { updateData.IsEnable ? "TRUE" : "FALSE" }
+                    }
+                }
+            });
+        }
+        catch (Exception ex)
+        {
+            return false;
+        }
         return true;
     }
 }

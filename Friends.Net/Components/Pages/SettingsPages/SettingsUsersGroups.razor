@@ -7,9 +7,11 @@
 @using Friends.Net.Services.LDAP.Models
 @using BlazorBootstrap;
 @using Friends.Net.Components.Webpart;
+@using Microsoft.AspNetCore.Identity
 @inject ApplicationDbContext DbContext
 @inject NavigationManager Navigation
 @inject LdapManager LdapManager
+@inject UserManager<ApplicationUser> UserManager
 
 @rendermode InteractiveServer
 
@@ -26,7 +28,7 @@
         <!-- Users Controls -->
         <MudTabPanel Text="Users" Icon="@Icons.Material.Filled.Person">
             <MudPaper Square="true" Class="d-flex">
-                <MudIconButton Icon="@Icons.Material.Filled.Refresh" Color="Color.Dark" Class="rounded-0" />
+                <MudIconButton Icon="@Icons.Material.Filled.Refresh" Color="Color.Dark" Class="rounded-0" OnClick="LoadData" />
                 <MudDivider Vertical="true" FlexItem="true" />
                 <MudIconButton Icon="@Icons.Material.Filled.Delete" Disabled="@_noUsersSelected" Color="Color.Dark" Class="rounded-0" OnClick="(() => ShowModal(ModalState.UserDelete))" />
                 <MudDivider Vertical="true" FlexItem="true" />
@@ -38,25 +40,21 @@
             </MudPaper>
 
             <MudTable T="LdapUserDto" Items="@Users" Hover="true" @onclick=CheckUsersTable Breakpoint="Breakpoint.Sm" @ref="mudUserTable"
-                      RowClass="cursor-pointer" MultiSelection="true">
+            RowClass="cursor-pointer" MultiSelection="true">
                 <ToolBarContent>
                     <MudTextField @bind-Value="_userSearchString" Placeholder="Search" Adornment="Adornment.Start" AdornmentIcon="@Icons.Material.Filled.Search" IconSize="Size.Medium" Class="mt-0 mud-ripple"></MudTextField>
                 </ToolBarContent>
                 <HeaderContent>
                     <MudTh>Email</MudTh>
+                    <MudTh>User ID</MudTh>
                     <MudTh>Display Name</MudTh>
-                    <MudTh>Given Name</MudTh>
-                    <MudTh>Surname</MudTh>
-                    <MudTh>Telephone Number</MudTh>
                     <MudTh>Enabled</MudTh>
                     <MudTh>Ldap User</MudTh>
                 </HeaderContent>
                 <RowTemplate>
                     <MudTd DataLabel="Email">@context.Email</MudTd>
-                    <MudTd DataLabel="Name">@context.DisplayName</MudTd>
-                    <MudTd DataLabel="Given Name">@context.GivenName</MudTd>
-                    <MudTd DataLabel="Surname">@context.Sn</MudTd>
-                    <MudTd DataLabel="Telephone Number">@context.TelephoneNumber</MudTd>
+                    <MudTd DataLabel="User ID">@context.Uid</MudTd>
+                    <MudTd DataLabel="Display Name">@context.DisplayName</MudTd>
                     <MudTd DataLabel="Enabled">
                         @if (context.IsEnable)
                         {
@@ -64,7 +62,7 @@
                         }
                         else
                         {
-                            <MudIcon Icon="@Icons.Material.Filled.Cancel"></MudIcon>
+                            <MudIcon Icon="@Icons.Material.Filled.Close"></MudIcon>
                         }
                     </MudTd>
                     <MudTd DataLabel="Is LDAP User">
@@ -74,7 +72,7 @@
                         }
                         else
                         {
-                            <MudIcon Icon="@Icons.Material.Filled.Cancel"></MudIcon>
+                            <MudIcon Icon="@Icons.Material.Filled.Close"></MudIcon>
                         }
                     </MudTd>
                 </RowTemplate>
@@ -83,7 +81,7 @@
         <!-- Groups Controls  -->
         <MudTabPanel Text="Groups" Icon="@Icons.Material.Filled.Group">
             <MudPaper Square="true" Class="d-flex">
-                <MudIconButton Icon="@Icons.Material.Filled.Refresh" Color="Color.Dark" Class="rounded-0" />
+                <MudIconButton Icon="@Icons.Material.Filled.Refresh" Color="Color.Dark" Class="rounded-0" OnClick="LoadData" />
                 <MudDivider Vertical="true" FlexItem="true" />
                 <MudIconButton Icon="@Icons.Material.Filled.Delete" Color="Color.Dark" Class="rounded-0" OnClick="(() => ShowModal(ModalState.GroupsDelete))" />
                 <MudDivider Vertical="true" FlexItem="true" />
@@ -98,12 +96,12 @@
                 <HeaderContent>
                     <MudTh>Cn</MudTh>
                     <MudTh>Description</MudTh>
-                    <MudTh>Member</MudTh>
+                    <MudTh>Members</MudTh>
                 </HeaderContent>
                 <RowTemplate>
                     <MudTd DataLabel="Cn">@context.Cn</MudTd>
                     <MudTd DataLabel="Description">@context.Description</MudTd>
-                    <MudTd DataLabel="Member">@($"{context.Member.Length} members") </MudTd>
+                    <MudTd DataLabel="Members">@($"{context.Member.Length} members") </MudTd>
                 </RowTemplate>
             </MudTable>
         </MudTabPanel>
@@ -112,6 +110,7 @@
 
 @{
     object ToSave = "";
+    string modId = "";
     <Modal @ref="_usersGroupsModal" title="@ModalTitle" IsVerticallyCentered="true">
         <BodyTemplate>
             @{
@@ -120,22 +119,25 @@
                     case ModalState.UsersAdd:
                         ToSave = new LdapUserDto();
                         userDict["IsLdapUser"].ReadOnly = false;
+                        userDict["Uid"].ReadOnly = false;
                         <AutoMudForm Object="ToSave"
-                                     ObjectFormMapping="userDict" />
+                        ObjectFormMapping="userDict" />
                         return;
                     case ModalState.UserDelete:
                         var delTxt = mudUserTable.SelectedItems?.Count > 1 ? "multiple users" : mudUserTable.SelectedItems?.First().Uid;
                         ToSave = mudUserTable.SelectedItem ?? new();
                         <AutoMudForm Object="ToSave"
-                                     Name="@delTxt"
-                                     Function="AutoMudForm.FormFunction.Delete"
-                                     ObjectFormMapping="userDict" />
+                        Name="@delTxt"
+                        Function="AutoMudForm.FormFunction.Delete"
+                        ObjectFormMapping="userDict" />
                         return;
                     case ModalState.UsersEdit:
                         userDict["IsLdapUser"].ReadOnly = true;
+                        userDict["Uid"].ReadOnly = true;
                         ToSave = mudUserTable.SelectedItem ?? new();
+                        modId = mudUserTable?.SelectedItem?.Uid ?? "";
                         <AutoMudForm Object="ToSave"
-                                     ObjectFormMapping="userDict" />
+                        ObjectFormMapping="userDict" />
                         return;
                     case ModalState.GroupsAdd:
                         <h3>Add Group</h3>
@@ -151,7 +153,29 @@
         </BodyTemplate>
         <FooterTemplate>
             <MudButton Color="Color.Secondary" OnClick="() => _usersGroupsModal.HideAsync()">Cancel</MudButton>
-            <MudButton Color="Color.Primary" OnClick="() => SaveObject(ToSave)">Save</MudButton>
+            @{
+                switch (_modalState)
+                {
+                    case ModalState.UsersAdd:
+                        <MudButton Color="Color.Primary" OnClick="() => CreateObject(ToSave)">Create</MudButton>
+                        return;
+                    case ModalState.UserDelete:
+                        <MudButton Color="Color.Primary" OnClick="() => DeleteObject(ToSave)">Delete</MudButton>
+                        return;
+                    case ModalState.UsersEdit:
+                        <MudButton Color="Color.Primary" OnClick="() => SaveObject(modId, ToSave)">Save</MudButton>
+                        return;
+                    case ModalState.GroupsAdd:
+                        <MudButton Color="Color.Primary" OnClick="() => CreateObject(ToSave)">Create</MudButton>
+                        return;
+                    case ModalState.GroupsDelete:
+                        <MudButton Color="Color.Primary" OnClick="() => DeleteObject(ToSave)">Delete</MudButton>
+                        return;
+                    case ModalState.GroupsEdit:
+                        <MudButton Color="Color.Primary" OnClick="() => SaveObject(modId, ToSave)">Save</MudButton>
+                        return;
+                }
+            }
         </FooterTemplate>
     </Modal>
 }
@@ -175,7 +199,7 @@
 
     private Dictionary<string, AutoMudForm.FormData> userDict = new Dictionary<string, AutoMudForm.FormData>
             {
-                { "Uid", new AutoMudForm.FormData("Uid", "User ID", true) },
+                { "Uid", new AutoMudForm.FormData("Uid", "User ID", true, false, true) },
                 { "GivenName", new AutoMudForm.FormData("GivenName", "First Name", true) },
                 { "Sn", new AutoMudForm.FormData("Sn", "Last Name", true) },
                 { "Cn", new AutoMudForm.FormData("Cn", "Common Name", false, true) },
@@ -200,11 +224,15 @@
     private ModalState _modalState;
     private Modal _usersGroupsModal = default!;
 
-    protected override async Task OnAfterRenderAsync(bool firstRender)
+    protected override void OnAfterRender(bool firstRender)
     {
         if (!firstRender) return;
-        Users = DbContext.Users.Select(u => u.ToLdap()).ToList();
+        LoadData();
+    }
 
+    private async void LoadData() 
+    {
+        Users = DbContext.Users.Select(u => u.ToLdap()).ToList();
         var ldapUsers = await LdapManager.Users.GetAll();
         foreach (LdapUserDto user in ldapUsers)
         {
@@ -217,6 +245,7 @@
                 dbUser.DisplayName = user.DisplayName;
                 dbUser.Password = user.Password;
                 dbUser.Email = user.Email;
+                dbUser.IsLdapUser = true;
             }
             else
             {
@@ -225,6 +254,7 @@
         }
         var ldapGroups = await LdapManager.Group.GetAll();
         Groups = ldapGroups.ToList();
+        StateHasChanged();
     }
 
     private async void ShowModal(ModalState state)
@@ -274,8 +304,39 @@
         _noUsersSelected = mudUserTable.SelectedItems?.Count == 0;
     }
 
-    private async void SaveObject(object Object)
+    private async void CreateObject(object Object)
     {
+
+    }
+
+    private async void DeleteObject(object Object)
+    {
+        if (Object is LdapUserDto ldapUser)
+        {
+            var dbObj = DbContext.Users.FirstOrDefault(u => u.Email == ldapUser.Email);
+            if (dbObj == null)
+            {
+                return;
+            }
+            await UserManager.DeleteAsync(dbObj);
+            if(dbObj.ConnectedToLdap)
+            {
+                var result = await LdapManager.Users.Delete(ldapUser);
+                if (result)
+                {
+                    Users.Remove(ldapUser);
+                }
+            }
+        }
+        await _usersGroupsModal.HideAsync();
+    }
+
+    private async void SaveObject(string uid, object Object)
+    {
+        if(Object is LdapUserDto ldapUser)
+        {
+            var result = await LdapManager.Users.Update(uid, ldapUser);
+        }
         await _usersGroupsModal.HideAsync();
     }
 }

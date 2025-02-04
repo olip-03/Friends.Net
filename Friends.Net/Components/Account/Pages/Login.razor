@@ -11,6 +11,7 @@
 @inject SignInManager<ApplicationUser> SignInManager
 @inject UserManager<ApplicationUser> UserManager
 @inject ILogger<Login> Logger
+@inject IUserStore<ApplicationUser> UserStore
 @inject NavigationManager NavigationManager
 @inject IdentityRedirectManager RedirectManager
 @inject LdapManager LdapManager
@@ -97,15 +98,33 @@
         var ldapPass = await LdapManager.Users.AuthenticateUser(Input.Email, Input.Password);
         var result = await SignInManager.PasswordSignInAsync(Input.Email, Input.Password, Input.RememberMe, lockoutOnFailure: false);
 
-        if(ldapPass.Succeeded && !result.Succeeded)
         { // users details need to be updated in the local db 
             ApplicationUser? localuser = DbContext.Users.FirstOrDefault(u => u.Email == Input.Email);
             LdapUserDto? ldapUser = await LdapManager.Users.Get(Input.Email);
-            DbContext.UpdateLocalUser(ldapUser);
 
-            await UserManager.RemovePasswordAsync(localuser);
-            await UserManager.AddPasswordAsync(localuser, Input.Password);
-
+            if (ldapUser == null)
+            {
+                errorMessage = "Error: This shouldn't be possible lol.";
+                return;
+            }
+            if (localuser == null)
+            { // Create local user
+                var user = Activator.CreateInstance<ApplicationUser>();
+                user.PreferredName = ldapUser.DisplayName;
+                await UserStore.SetUserNameAsync(user, Input.Email, CancellationToken.None);
+                var emailStore = GetEmailStore();
+                await emailStore.SetEmailAsync(user, Input.Email, CancellationToken.None);
+                var userResult = await UserManager.CreateAsync(user, Input.Password);
+                await UserManager.SetLockoutEnabledAsync(user, !ldapUser.IsEnable);
+            }
+            else
+            { // Update local user details
+                ldapUser.Password = Input.Password;
+                DbContext.UpdateLocalUser(ldapUser);
+                await UserManager.SetLockoutEnabledAsync(localuser, !ldapUser.IsEnable);
+                await UserManager.RemovePasswordAsync(localuser);
+                await UserManager.AddPasswordAsync(localuser, Input.Password);
+            }
             result = await SignInManager.PasswordSignInAsync(Input.Email, Input.Password, Input.RememberMe, lockoutOnFailure: false);
         }
 
@@ -129,6 +148,16 @@
         {
             errorMessage = "Error: Invalid login attempt.";
         }
+    }
+
+    private IUserEmailStore<ApplicationUser> GetEmailStore()
+    {
+        if (!UserManager.SupportsUserEmail)
+        {
+            throw new NotSupportedException("The default UI requires a user store with email support.");
+        }
+
+        return (IUserEmailStore<ApplicationUser>)UserStore;
     }
 
     private sealed class InputModel

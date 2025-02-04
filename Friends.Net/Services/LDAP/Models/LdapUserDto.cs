@@ -21,10 +21,10 @@ public class LdapUserDto
         string? uid = entry.Attributes.TryGetValue("uid", out DirectoryAttribute? uidAttribute) ? uidAttribute?.GetValues<string>().FirstOrDefault() : "";
         string? givenName = entry.Attributes.TryGetValue("givenName", out var givenNameAttribute) ? givenNameAttribute?.GetValues<string>().FirstOrDefault() : "";
         string? sn = entry.Attributes.TryGetValue("sn", out var snAttribute) ? snAttribute?.GetValues<string>().FirstOrDefault() : "";
-        string? cn = entry.Attributes.TryGetValue("sn", out var cnAttribute) ? cnAttribute?.GetValues<string>().FirstOrDefault() : "";
-        string? displayName = entry.Attributes.TryGetValue("sn", out var displaynameAttribute) ? displaynameAttribute?.GetValues<string>().FirstOrDefault() : "";
-        string? email = entry.Attributes.TryGetValue("sn", out var emailAttribute) ? emailAttribute?.GetValues<string>().FirstOrDefault() : "";
-        string? telephone = entry.Attributes.TryGetValue("sn", out var telephoneAttribute) ? telephoneAttribute?.GetValues<string>().FirstOrDefault() : "";
+        string? cn = entry.Attributes.TryGetValue("cn", out var cnAttribute) ? cnAttribute?.GetValues<string>().FirstOrDefault() : "";
+        string? displayName = entry.Attributes.TryGetValue("displayName", out var displaynameAttribute) ? displaynameAttribute?.GetValues<string>().FirstOrDefault() : "";
+        string? email = entry.Attributes.TryGetValue("mail", out var emailAttribute) ? emailAttribute?.GetValues<string>().FirstOrDefault() : "";
+        string? telephone = entry.Attributes.TryGetValue("telephone", out var telephoneAttribute) ? telephoneAttribute?.GetValues<string>().FirstOrDefault() : "";
         bool isEnabled = true;
         if (entry.Attributes.TryGetValue("nsaccountlock", out var nsAccountLockAttribute))
         {
